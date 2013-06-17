@@ -14,6 +14,8 @@
  * limitations under the License.
  */
 
+import java.io.IOException;
+
 import javax.swing.ImageIcon;
 import javax.swing.JFrame;
 import javax.swing.SwingUtilities;
@@ -33,8 +35,14 @@ public class Main extends JFrame {
 		super("Comet Busters");
 		setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
 		setIconImage(new ImageIcon(getClass().getClassLoader().getResource("img/icon.png")).getImage());
-		add(new GameView());
-		pack();
-		setVisible(true);
+		try {
+			add(new GameView());
+			pack();
+			setVisible(true);
+		} catch (IOException e) {
+			System.err.println("Error loading images!");
+			e.printStackTrace();
+			System.exit(1);
+		}
 	}
 }
