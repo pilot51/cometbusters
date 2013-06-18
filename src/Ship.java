@@ -5,24 +5,37 @@ import java.awt.geom.AffineTransform;
 public class Ship {
 	private static final int THRUST = 1, ROTATE_SPEED = 1; 
 	private Image image;
+	private Image[] thrustImages;
 	private float posX, posY, velX, velY;
-	private int shipCenter, thrust, rotateSpeed, rotateDeg;
+	private int shipRadius, thrustRadius, thrust, rotateSpeed, rotateDeg;
+	private AffineTransform trans = new AffineTransform();
 	
 	/**
 	 * Creates a new ship.
 	 * @param img Image to use for the ship.
+	 * @param thrustImgs Array of thrust images to be animated.
 	 * @param x Initial x-position.
 	 * @param y Initial y-position.
 	 */
-	Ship(Image img, int x, int y) {
+	Ship(Image img, Image[] thrustImgs, int x, int y) {
 		image = img;
-		shipCenter = image.getWidth(null) / 2;
+		shipRadius = image.getWidth(null) / 2;
+		thrustImages = thrustImgs;
+		thrustRadius = thrustImages[0].getWidth(null) / 2;
 		posX = x;
 		posY = y;
 	}
 	
 	Image getImage() {
 		return image;
+	}
+	
+	private int thrustFrame;
+	Image getThrustImage() {
+		if (++thrustFrame == thrustImages.length) {
+			thrustFrame = 0;
+		}
+		return thrustImages[thrustFrame];
 	}
 	
 	void calculateMotion() {
@@ -50,11 +63,20 @@ public class Ship {
 		}
 	}
 	
-	private AffineTransform trans = new AffineTransform();
 	AffineTransform getTransform() {
-		trans.setToTranslation(posX - shipCenter, posY - shipCenter);
-		trans.rotate(Math.toRadians(rotateDeg), shipCenter, shipCenter);
+		trans.setToTranslation(posX - shipRadius, posY - shipRadius);
+		trans.rotate(Math.toRadians(rotateDeg), shipRadius, shipRadius);
 		return trans;
+	}
+	
+	AffineTransform getThrustTransform() {
+		trans.setToTranslation(posX - (thrustRadius - 1), posY + shipRadius / 2);
+		trans.rotate(Math.toRadians(rotateDeg), thrustRadius - 1, -shipRadius / 2);
+		return trans;
+	}
+	
+	boolean isThrustActive() {
+		return thrust > 0;
 	}
 	
 	void thrust(boolean activate) {

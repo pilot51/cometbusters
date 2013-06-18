@@ -36,6 +36,8 @@ public class GameView extends JComponent implements KeyListener {
 		setPreferredSize(new Dimension(VIEW_WIDTH, VIEW_HEIGHT));
 		imgBg = ImageIO.read(getClass().getClassLoader().getResource("img/background.png"));
 		ship = new Ship(ImageIO.read(getClass().getClassLoader().getResource("img/ship.png")),
+		                new Image[] {ImageIO.read(getClass().getClassLoader().getResource("img/thrust1.png")),
+		                             ImageIO.read(getClass().getClassLoader().getResource("img/thrust2.png"))},
 		                VIEW_WIDTH / 2, VIEW_HEIGHT / 2);
 		addKeyListener(this);
 		setFocusable(true);
@@ -47,6 +49,9 @@ public class GameView extends JComponent implements KeyListener {
 		Graphics2D g2d = (Graphics2D)g;
 		g2d.drawImage(imgBg, 0, 0, null);
 		ship.calculateMotion();
+		if (ship.isThrustActive()) {
+			g2d.drawImage(ship.getThrustImage(), ship.getThrustTransform(), null);
+		}
 		g2d.drawImage(ship.getImage(), ship.getTransform(), null);
 		repaint();
 	}
