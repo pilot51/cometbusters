@@ -1,3 +1,19 @@
+/*
+ * Copyright 2013 Mark Injerd
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 import java.awt.Image;
 import java.awt.geom.AffineTransform;
 
@@ -7,7 +23,8 @@ public class Ship {
 	private Image image;
 	private Image[] thrustImages;
 	private float posX, posY, velX, velY;
-	private int shipRadius, thrustRadius, thrust, rotateSpeed, rotateDeg;
+	private int shipRadius, thrustRadius, rotateSpeed, rotateDeg;
+	private boolean isThrusting;
 	private AffineTransform trans = new AffineTransform();
 	
 	/**
@@ -47,6 +64,7 @@ public class Ship {
 		}
 		final double radians = Math.toRadians(rotateDeg);
 		final float dt = 0.1f;
+		int thrust = isThrusting ? THRUST : 0;
 		velY -= Math.cos(radians) * thrust * dt;
 		velX += Math.sin(radians) * thrust * dt;
 		posY += velY * dt;
@@ -76,11 +94,14 @@ public class Ship {
 	}
 	
 	boolean isThrustActive() {
-		return thrust > 0;
+		return isThrusting;
 	}
 	
 	void thrust(boolean activate) {
-		thrust = activate ? THRUST : 0;
+		if (isThrusting == activate) return;
+		isThrusting = activate;
+		if (activate) Sound.THRUST.loop();
+		else Sound.THRUST.stop();
 	}
 	
 	void rotateLeft() {

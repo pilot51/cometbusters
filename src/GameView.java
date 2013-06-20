@@ -18,6 +18,7 @@ import java.awt.Dimension;
 import java.awt.Graphics;
 import java.awt.Graphics2D;
 import java.awt.Image;
+import java.awt.Toolkit;
 import java.awt.event.KeyEvent;
 import java.awt.event.KeyListener;
 import java.io.IOException;
@@ -31,6 +32,7 @@ public class GameView extends JComponent implements KeyListener {
 	static final int VIEW_WIDTH = 1024, VIEW_HEIGHT = 768;
 	private Ship ship;
 	private Image imgBg;
+	private boolean[] keysPressed = new boolean[1024];
 	
 	GameView() throws IOException {
 		setPreferredSize(new Dimension(VIEW_WIDTH, VIEW_HEIGHT));
@@ -39,6 +41,7 @@ public class GameView extends JComponent implements KeyListener {
 		                new Image[] {ImageIO.read(getClass().getClassLoader().getResource("img/thrust1.png")),
 		                             ImageIO.read(getClass().getClassLoader().getResource("img/thrust2.png"))},
 		                VIEW_WIDTH / 2, VIEW_HEIGHT / 2);
+		Sound.init();
 		addKeyListener(this);
 		setFocusable(true);
 	}
@@ -58,6 +61,8 @@ public class GameView extends JComponent implements KeyListener {
 	
 	@Override
 	public void keyPressed(KeyEvent e) {
+		if (e.isConsumed()) return;
+		keysPressed[e.getKeyCode()] = true;
 		switch (e.getKeyCode()) {
 			case KeyEvent.VK_UP:
 				ship.thrust(true);
@@ -73,6 +78,10 @@ public class GameView extends JComponent implements KeyListener {
 	
 	@Override
 	public void keyReleased(KeyEvent e) {
+		if (e.isConsumed()) return;
+		KeyEvent nextPress = (KeyEvent)Toolkit.getDefaultToolkit().getSystemEventQueue().peekEvent(KeyEvent.KEY_PRESSED);
+		if (nextPress != null && nextPress.getWhen() == e.getWhen()) return;
+		keysPressed[e.getKeyCode()] = false;
 		switch (e.getKeyCode()) {
 			case KeyEvent.VK_UP:
 				ship.thrust(false);
