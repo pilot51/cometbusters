@@ -34,14 +34,17 @@ public class GameView extends JComponent implements KeyListener {
 	private Image imgBg;
 	private boolean[] keysPressed = new boolean[1024];
 	
+	/**
+	 * Creates the game view and objects required within it.
+	 * @throws IOException if any images could not be read.
+	 */
 	GameView() throws IOException {
 		setPreferredSize(new Dimension(VIEW_WIDTH, VIEW_HEIGHT));
 		imgBg = ImageIO.read(getClass().getClassLoader().getResource("img/background.png"));
 		ship = new Ship(ImageIO.read(getClass().getClassLoader().getResource("img/ship.png")),
-		                new Image[] {ImageIO.read(getClass().getClassLoader().getResource("img/thrust1.png")),
-		                             ImageIO.read(getClass().getClassLoader().getResource("img/thrust2.png"))},
 		                VIEW_WIDTH / 2, VIEW_HEIGHT / 2);
 		Sound.init();
+		Bullet.init();
 		addKeyListener(this);
 		setFocusable(true);
 	}
@@ -56,6 +59,10 @@ public class GameView extends JComponent implements KeyListener {
 			g2d.drawImage(ship.getThrustImage(), ship.getThrustTransform(), null);
 		}
 		g2d.drawImage(ship.getImage(), ship.getTransform(), null);
+		for (Bullet b : ship.getBullets()) {
+			b.calculateMotion();
+			g2d.drawImage(Bullet.getImage(), b.getTransform(), null);
+		}
 		repaint();
 	}
 	
@@ -72,6 +79,9 @@ public class GameView extends JComponent implements KeyListener {
 				break;
 			case KeyEvent.VK_RIGHT:
 				ship.rotateRight();
+				break;
+			case KeyEvent.VK_CONTROL:
+				ship.fire();
 				break;
 		}
 	}

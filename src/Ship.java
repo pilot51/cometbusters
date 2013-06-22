@@ -16,6 +16,11 @@
 
 import java.awt.Image;
 import java.awt.geom.AffineTransform;
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.List;
+
+import javax.imageio.ImageIO;
 
 
 public class Ship {
@@ -26,6 +31,7 @@ public class Ship {
 	private int shipRadius, thrustRadius, rotateSpeed, rotateDeg;
 	private boolean isThrusting;
 	private AffineTransform trans = new AffineTransform();
+	private final List<Bullet> bullets = new ArrayList<Bullet>(4);
 	
 	/**
 	 * Creates a new ship.
@@ -33,11 +39,13 @@ public class Ship {
 	 * @param thrustImgs Array of thrust images to be animated.
 	 * @param x Initial x-position.
 	 * @param y Initial y-position.
+	 * @throws IOException if thrust images could not be read.
 	 */
-	Ship(Image img, Image[] thrustImgs, int x, int y) {
+	Ship(Image img, int x, int y) throws IOException {
 		image = img;
 		shipRadius = image.getWidth(null) / 2;
-		thrustImages = thrustImgs;
+		thrustImages = new Image[] {ImageIO.read(getClass().getClassLoader().getResource("img/thrust1.png")),
+		                            ImageIO.read(getClass().getClassLoader().getResource("img/thrust2.png"))};
 		thrustRadius = thrustImages[0].getWidth(null) / 2;
 		posX = x;
 		posY = y;
@@ -63,12 +71,12 @@ public class Ship {
 			rotateDeg -= 360;
 		}
 		final double radians = Math.toRadians(rotateDeg);
-		final float dt = 0.1f;
+		final float speedMultiplier = 0.1f;
 		int thrust = isThrusting ? THRUST : 0;
-		velY -= Math.cos(radians) * thrust * dt;
-		velX += Math.sin(radians) * thrust * dt;
-		posY += velY * dt;
-		posX += velX * dt;
+		velX += Math.sin(radians) * thrust * speedMultiplier;
+		velY -= Math.cos(radians) * thrust * speedMultiplier;
+		posX += velX * speedMultiplier;
+		posY += velY * speedMultiplier;
 		if (posX < 0) {
 			posX += GameView.VIEW_WIDTH;
 		} else if (posX > GameView.VIEW_WIDTH) {
@@ -114,5 +122,23 @@ public class Ship {
 	
 	void rotateStop() {
 		rotateSpeed = 0;
+	}
+	
+	void fire() {
+		if (bullets.size() < Bullet.MAX_BULLETS) {
+			Sound.SHOOT.play();
+			float bulletX = (float)(posX + Math.sin(Math.toRadians(rotateDeg)) * (shipRadius - Bullet.getRadius())),
+			      bulletY = (float)(posY - Math.cos(Math.toRadians(rotateDeg)) * (shipRadius - Bullet.getRadius()));
+			bullets.add(new Bullet(bulletX, bulletY, rotateDeg));
+		}
+	}
+	
+	List<Bullet> getBullets() {
+		for (int i = bullets.size() - 1; i >= 0; i--) {
+			if (bullets.get(i).isExpired()) {
+				bullets.remove(i);
+			}
+		}
+		return bullets;
 	}
 }

@@ -24,7 +24,8 @@ import javax.sound.sampled.LineUnavailableException;
 import javax.sound.sampled.UnsupportedAudioFileException;
 
 public enum Sound {
-	THRUST("snd/thrust.wav");
+	THRUST("snd/thrust.wav"),
+	SHOOT("snd/shoot.wav");
 	
 	static void init() {
 		values();
@@ -47,11 +48,13 @@ public enum Sound {
 	}
 	
 	void play() {
-		clip.start();
+		clip.setFramePosition(0);
+		clip.loop(0); // Workaround for Clip.start() to avoid using Clip.stop()
 	}
 	
 	void loop() {
 		if (!clip.isRunning()) {
+			clip.setFramePosition(0);
 			clip.loop(Clip.LOOP_CONTINUOUSLY);
 		}
 	}
@@ -62,7 +65,6 @@ public enum Sound {
 				@Override
 				public void run() {
 					clip.stop(); // FIXME: This is very laggy
-					clip.setFramePosition(0);
 				}
 			}).start();
 		}
