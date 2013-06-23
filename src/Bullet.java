@@ -20,14 +20,11 @@ import java.io.IOException;
 
 import javax.imageio.ImageIO;
 
-public class Bullet {
-	static final int MAX_BULLETS = 4;
+public class Bullet extends Entity {
 	private static Image image;
 	private static int radius;
 	private static final long DURATION = 2000;
 	private static final int SPEED = 15;
-	private float posX, posY, velX, velY;
-	private int directionDeg;
 	private long timeCreated;
 	private boolean isExpired;
 	
@@ -38,13 +35,7 @@ public class Bullet {
 	 * @param deg Bullet direction in degrees.
 	 */
 	Bullet(float x, float y, int deg) {
-		posX = x;
-		posY = y;
-		directionDeg = deg;
-		final double radians = Math.toRadians(directionDeg);
-		final float speedMultiplier = 0.1f;
-		velX = (float)Math.sin(radians) * SPEED * speedMultiplier;
-		velY = (float)Math.cos(radians) * SPEED * speedMultiplier;
+		super(x, y, deg, SPEED, 0, 0);
 		timeCreated = System.currentTimeMillis();
 	}
 	
@@ -62,18 +53,7 @@ public class Bullet {
 			isExpired = true;
 			return;
 		}
-		posX += velX;
-		posY -= velY;
-		if (posX < 0) {
-			posX += GameView.VIEW_WIDTH;
-		} else if (posX > GameView.VIEW_WIDTH) {
-			posX -= GameView.VIEW_WIDTH;
-		}
-		if (posY < 0) {
-			posY += GameView.VIEW_HEIGHT;
-		} else if (posY > GameView.VIEW_HEIGHT) {
-			posY -= GameView.VIEW_HEIGHT;
-		}
+		super.calculateMotion();
 	}
 	
 	static Image getImage() {
