@@ -27,14 +27,14 @@ public class Entity {
 	private final int ROTATE_SPEED;
 	
 	/**
-	 * Creates an object at the given coordinates with potential acceleration and rotation speed.
+	 * Creates an object at the given coordinates with initial rotation and velocity.
 	 * @param x Initial x-position.
 	 * @param y Initial y-position.
-	 * @param acceleration Forward acceleration applied when {@link #isAccelerating} is true.
-	 * @param rotationSpeed Rotation speed applied when {@link #rotateLeft()} or {@link #rotateRight()} is called, stopped with {@link #rotateStop()}.
+	 * @param rotationDeg Initial rotation in degrees.
+	 * @param velocity Initial forward velocity.
 	 */
-	Entity(int x, int y, int acceleration, int rotationSpeed) {
-		this(x, y, 0, 0, acceleration, rotationSpeed);
+	Entity(float x, float y, int rotationDeg, int velocity) {
+		this(x, y, rotationDeg, velocity, 0, 0);
 	}
 	
 	/**
@@ -57,6 +57,9 @@ public class Entity {
 		velY = (float)Math.cos(radians) * velocity;
 	}
 	
+	/**
+	 * Calculates entity motion.
+	 */
 	void calculateMotion() {
 		rotateDeg += rotation;
 		if (rotateDeg < 0) {
@@ -74,6 +77,9 @@ public class Entity {
 		wrapScreen();
 	}
 	
+	/**
+	 * Wraps entity from one side of the screen to the opposite side.
+	 */
 	private void wrapScreen() {
 		if (posX < 0) {
 			posX += GameView.VIEW_WIDTH;
@@ -87,18 +93,37 @@ public class Entity {
 		}
 	}
 	
+	/**
+	 * Sets entity to accelerate at the predefined rate.
+	 * @param accel True to accelerate, false to stop accelerating.
+	 */
 	void setAccelerating(boolean accel) {
 		isAccelerating = accel;
 	}
 	
+	/**
+	 * Rotates entity left at the predefined speed.
+	 * @see #rotateRight()
+	 * @see #rotateStop()
+	 */
 	void rotateLeft() {
 		rotation = -ROTATE_SPEED;
 	}
 	
+	/**
+	 * Rotates entity right at the predefined speed.
+	 * @see #rotateLeft()
+	 * @see #rotateStop()
+	 */
 	void rotateRight() {
 		rotation = ROTATE_SPEED;
 	}
 	
+	/**
+	 * Stops entity rotation.
+	 * @see #rotateLeft()
+	 * @see #rotateRight()
+	 */
 	void rotateStop() {
 		rotation = 0;
 	}

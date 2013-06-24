@@ -14,6 +14,7 @@
  * limitations under the License.
  */
 
+import java.awt.Graphics2D;
 import java.awt.Image;
 import java.awt.geom.AffineTransform;
 import java.io.IOException;
@@ -35,7 +36,7 @@ public class Bullet extends Entity {
 	 * @param deg Bullet direction in degrees.
 	 */
 	Bullet(float x, float y, int deg) {
-		super(x, y, deg, SPEED, 0, 0);
+		super(x, y, deg, SPEED);
 		timeCreated = System.currentTimeMillis();
 	}
 	
@@ -56,8 +57,11 @@ public class Bullet extends Entity {
 		super.calculateMotion();
 	}
 	
-	static Image getImage() {
-		return image;
+	static void drawBullets(Graphics2D g2d, Ship ship) {
+		for (Bullet b : ship.getBullets()) {
+			b.calculateMotion();
+			g2d.drawImage(image, b.getTransform(), null);
+		}
 	}
 	
 	static int getRadius() {
@@ -65,7 +69,7 @@ public class Bullet extends Entity {
 	}
 	
 	private AffineTransform trans = new AffineTransform();
-	AffineTransform getTransform() {
+	private AffineTransform getTransform() {
 		trans.setToTranslation(posX - radius, posY - radius);
 		return trans;
 	}

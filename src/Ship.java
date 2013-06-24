@@ -14,6 +14,7 @@
  * limitations under the License.
  */
 
+import java.awt.Graphics2D;
 import java.awt.Image;
 import java.awt.geom.AffineTransform;
 import java.io.IOException;
@@ -33,48 +34,52 @@ public class Ship extends Entity {
 	
 	/**
 	 * Creates a new ship.
-	 * @param img Image to use for the ship.
 	 * @param x Initial x-position.
 	 * @param y Initial y-position.
 	 * @throws IOException if thrust images could not be read.
 	 */
-	Ship(Image img, int x, int y) throws IOException {
-		super(x, y, THRUST, ROTATE_SPEED);
-		image = img;
+	Ship(int x, int y) throws IOException {
+		super(x, y, 0, 0, THRUST, ROTATE_SPEED);
+		image = ImageIO.read(getClass().getClassLoader().getResource("img/ship.png"));
 		shipRadius = image.getWidth(null) / 2;
 		thrustImages = new Image[] {ImageIO.read(getClass().getClassLoader().getResource("img/thrust1.png")),
 		                            ImageIO.read(getClass().getClassLoader().getResource("img/thrust2.png"))};
 		thrustRadius = thrustImages[0].getWidth(null) / 2;
 	}
 	
-	Image getImage() {
-		return image;
+	void drawShip(Graphics2D g2d) {
+		calculateMotion();
+		if (isAccelerating) {
+			g2d.drawImage(getThrustImage(), getThrustTransform(), null);
+		}
+		g2d.drawImage(image, getTransform(), null);
 	}
 	
 	private int thrustFrame;
-	Image getThrustImage() {
+	private Image getThrustImage() {
 		if (++thrustFrame == thrustImages.length) {
 			thrustFrame = 0;
 		}
 		return thrustImages[thrustFrame];
 	}
 	
-	AffineTransform getTransform() {
+	private AffineTransform getTransform() {
 		trans.setToTranslation(posX - shipRadius, posY - shipRadius);
 		trans.rotate(Math.toRadians(rotateDeg), shipRadius, shipRadius);
 		return trans;
 	}
 	
-	AffineTransform getThrustTransform() {
+	private AffineTransform getThrustTransform() {
 		trans.setToTranslation(posX - (thrustRadius - 1), posY + shipRadius / 2);
 		trans.rotate(Math.toRadians(rotateDeg), thrustRadius - 1, -shipRadius / 2);
 		return trans;
 	}
 	
-	boolean isThrustActive() {
-		return isAccelerating;
-	}
-	
+	/**
+	 * Makes ship accelerate forward if set to true.<br />
+	 * Plays or stops thrust sound.
+	 * @param activate True to activate thrust, false to deactivate.
+	 */
 	void thrust(boolean activate) {
 		if (isAccelerating == activate) return;
 		isAccelerating = activate;
@@ -82,6 +87,11 @@ public class Ship extends Entity {
 		else Sound.THRUST.stop();
 	}
 	
+	/**
+	 * Fires a {@link Bullet} in the direction that this ship is facing.<br />
+	 * Only {@value #MAX_BULLETS} bullets may be live simultaneously, at which point firing is prevented.<br />
+	 * Also plays shooting sound.
+	 */
 	void fire() {
 		if (BULLETS.size() < MAX_BULLETS) {
 			Sound.SHOOT.play();
@@ -91,6 +101,10 @@ public class Ship extends Entity {
 		}
 	}
 	
+	/**
+	 * Gets a list of live bullets fired by this ship, after removing expired bullets. 
+	 * @return List of live {@link Bullet}'s fired from this ship.
+	 */
 	List<Bullet> getBullets() {
 		for (int i = BULLETS.size() - 1; i >= 0; i--) {
 			if (BULLETS.get(i).isExpired()) {

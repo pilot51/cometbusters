@@ -41,10 +41,10 @@ public class GameView extends JComponent implements KeyListener {
 	GameView() throws IOException {
 		setPreferredSize(new Dimension(VIEW_WIDTH, VIEW_HEIGHT));
 		imgBg = ImageIO.read(getClass().getClassLoader().getResource("img/background.png"));
-		ship = new Ship(ImageIO.read(getClass().getClassLoader().getResource("img/ship.png")),
-		                VIEW_WIDTH / 2, VIEW_HEIGHT / 2);
+		ship = new Ship(VIEW_WIDTH / 2, VIEW_HEIGHT / 2);
 		Sound.init();
 		Bullet.init();
+		Asteroid.generateAsteroids(1);
 		addKeyListener(this);
 		setFocusable(true);
 	}
@@ -54,15 +54,9 @@ public class GameView extends JComponent implements KeyListener {
 		super.paintComponent(g);
 		Graphics2D g2d = (Graphics2D)g;
 		g2d.drawImage(imgBg, 0, 0, null);
-		ship.calculateMotion();
-		if (ship.isThrustActive()) {
-			g2d.drawImage(ship.getThrustImage(), ship.getThrustTransform(), null);
-		}
-		g2d.drawImage(ship.getImage(), ship.getTransform(), null);
-		for (Bullet b : ship.getBullets()) {
-			b.calculateMotion();
-			g2d.drawImage(Bullet.getImage(), b.getTransform(), null);
-		}
+		Asteroid.drawAsteroids(g2d);
+		ship.drawShip(g2d);
+		Bullet.drawBullets(g2d, ship);
 		repaint();
 	}
 	
