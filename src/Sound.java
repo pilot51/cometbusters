@@ -25,7 +25,8 @@ import javax.sound.sampled.UnsupportedAudioFileException;
 
 public enum Sound {
 	THRUST("snd/thrust.wav"),
-	SHOOT("snd/shoot.wav");
+	SHOOT("snd/shoot.wav"),
+	ROCK_EXPLODE("snd/rock_explode.wav");
 	
 	static void init() {
 		values();

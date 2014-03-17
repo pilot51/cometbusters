@@ -14,8 +14,9 @@
  * limitations under the License.
  */
 
-public class Entity {
+public abstract class Entity {
 	protected float posX, posY, velX, velY;
+	protected int radius;
 	protected boolean isAccelerating;
 	/** Current rotation in degrees. */
 	protected int rotateDeg;
@@ -25,7 +26,8 @@ public class Entity {
 	private final int ACCELERATION;
 	/** Rotation speed applied when {@link #rotateLeft()} or {@link #rotateRight()} is called, stopped with {@link #rotateStop()}. */
 	private final int ROTATE_SPEED;
-	
+	private boolean isDestroyed;
+
 	/**
 	 * Creates an object at the given coordinates with initial rotation and velocity.
 	 * @param x Initial x-position.
@@ -36,7 +38,7 @@ public class Entity {
 	Entity(float x, float y, int rotationDeg, int velocity) {
 		this(x, y, rotationDeg, velocity, 0, 0);
 	}
-	
+
 	/**
 	 * Creates an object at the given coordinates with initial rotation, initial velocity,
 	 * potential acceleration, and potential rotation speed.
@@ -56,7 +58,11 @@ public class Entity {
 		velX = (float)Math.sin(radians) * velocity;
 		velY = (float)Math.cos(radians) * velocity;
 	}
-	
+
+	final int getRadius() {
+		return radius;
+	}
+
 	/**
 	 * Calculates entity motion.
 	 */
@@ -76,7 +82,7 @@ public class Entity {
 		posY -= velY * speedMultiplier;
 		wrapScreen();
 	}
-	
+
 	/**
 	 * Wraps entity from one side of the screen to the opposite side.
 	 */
@@ -92,7 +98,7 @@ public class Entity {
 			posY -= GameView.VIEW_HEIGHT;
 		}
 	}
-	
+
 	/**
 	 * Sets entity to accelerate at the predefined rate.
 	 * @param accel True to accelerate, false to stop accelerating.
@@ -100,7 +106,7 @@ public class Entity {
 	void setAccelerating(boolean accel) {
 		isAccelerating = accel;
 	}
-	
+
 	/**
 	 * Rotates entity left at the predefined speed.
 	 * @see #rotateRight()
@@ -109,7 +115,7 @@ public class Entity {
 	void rotateLeft() {
 		rotation = -ROTATE_SPEED;
 	}
-	
+
 	/**
 	 * Rotates entity right at the predefined speed.
 	 * @see #rotateLeft()
@@ -118,7 +124,7 @@ public class Entity {
 	void rotateRight() {
 		rotation = ROTATE_SPEED;
 	}
-	
+
 	/**
 	 * Stops entity rotation.
 	 * @see #rotateLeft()
@@ -126,5 +132,37 @@ public class Entity {
 	 */
 	void rotateStop() {
 		rotation = 0;
+	}
+
+	/**
+	 * Checks if this entity is contacting another. This is not the same as a collision and does not modify either object.
+	 * @param otherEntity The other entity to test against.
+	 * @return True if this and otherEntity are contacting.
+	 * @see #collide(Entity)
+	 */
+	final boolean isContacting(Entity otherEntity) {
+		return Math.abs(posX - otherEntity.posX)
+				+ Math.abs(posY - otherEntity.posY) < radius + otherEntity.radius;
+	}
+
+	/**
+	 * Collides this with another entity, destroying them.
+	 * @param otherEntity The other entity to collide with.
+	 */
+	void collide(Entity otherEntity) {
+		destroy();
+		otherEntity.destroy();
+	}
+
+	/**
+	 * Sets this entity as destroyed.
+	 * @see #isDestroyed()
+	 */
+	void destroy() {
+		isDestroyed = true;
+	}
+
+	final boolean isDestroyed() {
+		return isDestroyed;
 	}
 }

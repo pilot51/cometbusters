@@ -21,13 +21,13 @@ import java.io.IOException;
 
 import javax.imageio.ImageIO;
 
-public class Bullet extends Entity {
+public final class Bullet extends Entity {
 	private static Image image;
 	private static int radius;
 	private static final long DURATION = 2000;
 	private static final int SPEED = 15;
 	private long timeCreated;
-	private boolean isExpired;
+	private AffineTransform trans = new AffineTransform();
 	
 	/**
 	 * Creates a new bullet.
@@ -37,6 +37,7 @@ public class Bullet extends Entity {
 	 */
 	Bullet(float x, float y, int deg) {
 		super(x, y, deg, SPEED);
+		super.radius = radius;
 		timeCreated = System.currentTimeMillis();
 	}
 	
@@ -51,10 +52,23 @@ public class Bullet extends Entity {
 	
 	void calculateMotion() {
 		if (System.currentTimeMillis() - timeCreated > DURATION) {
-			isExpired = true;
+			destroy();
 			return;
 		}
 		super.calculateMotion();
+		checkForImpact();
+	}
+
+	/**
+	 * Checks if this bullet is contacting an asteroid and if so, collides them.
+	 */
+	private void checkForImpact() {
+		for (Asteroid a : Asteroid.getAsteroids()) {
+			if (isContacting(a)) {
+				collide(a);
+				break;
+			}
+		}
 	}
 	
 	static void drawBullets(Graphics2D g2d, Ship ship) {
@@ -64,17 +78,15 @@ public class Bullet extends Entity {
 		}
 	}
 	
-	static int getRadius() {
+	/**
+	 * Static method to get bullet radius, since all bullets have the same radius.
+	 */
+	static int getBulletRadius() {
 		return radius;
 	}
 	
-	private AffineTransform trans = new AffineTransform();
 	private AffineTransform getTransform() {
 		trans.setToTranslation(posX - radius, posY - radius);
 		return trans;
-	}
-	
-	boolean isExpired() {
-		return isExpired;
 	}
 }

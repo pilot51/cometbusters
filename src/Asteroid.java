@@ -24,14 +24,14 @@ import javax.imageio.ImageIO;
  * limitations under the License.
  */
 
-public class Asteroid extends Entity {
+public final class Asteroid extends Entity {
 	private static final List<Asteroid> ASTEROIDS = new ArrayList<Asteroid>();
 	private static final int MAX_ASTEROIDS = 8, MIN_SPEED = 2, MAX_SPEED = 8;
 	private static final byte SIZE_LARGE = 0, SIZE_MEDIUM = 1, SIZE_SMALL = 2;
 	private static Image[] image = new Image[3];
 	private static final Random random = new Random();
 	private byte size;
-	private int radius;
+	private AffineTransform trans = new AffineTransform();
 	
 	private Asteroid(float x, float y, int rotationDeg, int velocity) {
 		super(x, y, rotationDeg, velocity);
@@ -58,16 +58,34 @@ public class Asteroid extends Entity {
 		}
 	}
 	
-	private AffineTransform trans = new AffineTransform();
 	private AffineTransform getTransform() {
 		trans.setToTranslation(posX - radius, posY - radius);
 		return trans;
 	}
 	
 	static void drawAsteroids(Graphics2D g2d) {
+		removeDestroyed();
 		for (Asteroid a : ASTEROIDS) {
 			a.calculateMotion();
 			g2d.drawImage(image[a.size], a.getTransform(), null);
 		}
+	}
+
+	@Override
+	void destroy() {
+		Sound.ROCK_EXPLODE.play();
+		super.destroy();
+	}
+
+	private static void removeDestroyed() {
+		for (int i = ASTEROIDS.size() - 1; i >= 0; i--) {
+			if (ASTEROIDS.get(i).isDestroyed()) {
+				ASTEROIDS.remove(i);
+			}
+		}
+	}
+
+	static List<Asteroid> getAsteroids() {
+		return ASTEROIDS;
 	}
 }

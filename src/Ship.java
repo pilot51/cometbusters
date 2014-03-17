@@ -24,11 +24,11 @@ import java.util.List;
 import javax.imageio.ImageIO;
 
 
-public class Ship extends Entity {
+public final class Ship extends Entity {
 	private static final int THRUST = 1, ROTATE_SPEED = 1, MAX_BULLETS = 4; 
 	private Image image;
 	private Image[] thrustImages;
-	private int shipRadius, thrustRadius;
+	private int thrustRadius;
 	private AffineTransform trans = new AffineTransform();
 	private final List<Bullet> BULLETS = new ArrayList<Bullet>(MAX_BULLETS);
 	
@@ -41,7 +41,7 @@ public class Ship extends Entity {
 	Ship(int x, int y) throws IOException {
 		super(x, y, 0, 0, THRUST, ROTATE_SPEED);
 		image = ImageIO.read(getClass().getClassLoader().getResource("img/ship.png"));
-		shipRadius = image.getWidth(null) / 2;
+		radius = image.getWidth(null) / 2;
 		thrustImages = new Image[] {ImageIO.read(getClass().getClassLoader().getResource("img/thrust1.png")),
 		                            ImageIO.read(getClass().getClassLoader().getResource("img/thrust2.png"))};
 		thrustRadius = thrustImages[0].getWidth(null) / 2;
@@ -64,14 +64,14 @@ public class Ship extends Entity {
 	}
 	
 	private AffineTransform getTransform() {
-		trans.setToTranslation(posX - shipRadius, posY - shipRadius);
-		trans.rotate(Math.toRadians(rotateDeg), shipRadius, shipRadius);
+		trans.setToTranslation(posX - radius, posY - radius);
+		trans.rotate(Math.toRadians(rotateDeg), radius, radius);
 		return trans;
 	}
 	
 	private AffineTransform getThrustTransform() {
-		trans.setToTranslation(posX - (thrustRadius - 1), posY + shipRadius / 2);
-		trans.rotate(Math.toRadians(rotateDeg), thrustRadius - 1, -shipRadius / 2);
+		trans.setToTranslation(posX - (thrustRadius - 1), posY + radius / 2);
+		trans.rotate(Math.toRadians(rotateDeg), thrustRadius - 1, -radius / 2);
 		return trans;
 	}
 	
@@ -95,8 +95,8 @@ public class Ship extends Entity {
 	void fire() {
 		if (BULLETS.size() < MAX_BULLETS) {
 			Sound.SHOOT.play();
-			float bulletX = (float)(posX + Math.sin(Math.toRadians(rotateDeg)) * (shipRadius - Bullet.getRadius())),
-			      bulletY = (float)(posY - Math.cos(Math.toRadians(rotateDeg)) * (shipRadius - Bullet.getRadius()));
+			float bulletX = (float)(posX + Math.sin(Math.toRadians(rotateDeg)) * (radius - Bullet.getBulletRadius())),
+			      bulletY = (float)(posY - Math.cos(Math.toRadians(rotateDeg)) * (radius - Bullet.getBulletRadius()));
 			BULLETS.add(new Bullet(bulletX, bulletY, rotateDeg));
 		}
 	}
@@ -107,7 +107,7 @@ public class Ship extends Entity {
 	 */
 	List<Bullet> getBullets() {
 		for (int i = BULLETS.size() - 1; i >= 0; i--) {
-			if (BULLETS.get(i).isExpired()) {
+			if (BULLETS.get(i).isDestroyed()) {
 				BULLETS.remove(i);
 			}
 		}
