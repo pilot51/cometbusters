@@ -52,6 +52,11 @@ public class GameView extends JComponent implements KeyListener {
 	@Override
 	protected void paintComponent(Graphics g) {
 		super.paintComponent(g);
+		for (Asteroid a : Asteroid.getAsteroids()) {
+			if (ship.isContacting(a)) {
+				ship.collide(a);
+			}
+		}
 		Graphics2D g2d = (Graphics2D)g;
 		g2d.drawImage(imgBg, 0, 0, null);
 		Asteroid.drawAsteroids(g2d);
@@ -62,7 +67,7 @@ public class GameView extends JComponent implements KeyListener {
 	
 	@Override
 	public void keyPressed(KeyEvent e) {
-		if (e.isConsumed()) return;
+		if (e.isConsumed() || ship.isDestroyed()) return;
 		keysPressed[e.getKeyCode()] = true;
 		switch (e.getKeyCode()) {
 			case KeyEvent.VK_UP:

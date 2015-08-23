@@ -48,6 +48,7 @@ public final class Ship extends Entity {
 	}
 	
 	void drawShip(Graphics2D g2d) {
+		if (isDestroyed()) return;
 		calculateMotion();
 		if (isAccelerating) {
 			g2d.drawImage(getThrustImage(), getThrustTransform(), null);
@@ -112,5 +113,13 @@ public final class Ship extends Entity {
 			}
 		}
 		return BULLETS;
+	}
+
+	@Override
+	void destroy() {
+		thrust(false);
+		rotateStop();
+		Sound.SHIP_EXPLODE.play();
+		super.destroy();
 	}
 }

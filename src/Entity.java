@@ -137,11 +137,11 @@ public abstract class Entity {
 	/**
 	 * Checks if this entity is contacting another. This is not the same as a collision and does not modify either object.
 	 * @param otherEntity The other entity to test against.
-	 * @return True if this and otherEntity are contacting.
+	 * @return True if this and otherEntity are contacting and neither are already destroyed.
 	 * @see #collide(Entity)
 	 */
 	final boolean isContacting(Entity otherEntity) {
-		return Math.abs(posX - otherEntity.posX)
+		return !isDestroyed && !otherEntity.isDestroyed && Math.abs(posX - otherEntity.posX)
 				+ Math.abs(posY - otherEntity.posY) < radius + otherEntity.radius;
 	}
 
