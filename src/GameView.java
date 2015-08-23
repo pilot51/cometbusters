@@ -55,6 +55,7 @@ public class GameView extends JComponent implements KeyListener {
 		for (Asteroid a : Asteroid.getAsteroids()) {
 			if (ship.isContacting(a)) {
 				ship.collide(a);
+				break;
 			}
 		}
 		Graphics2D g2d = (Graphics2D)g;

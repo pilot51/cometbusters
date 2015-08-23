@@ -119,7 +119,7 @@ public final class Ship extends Entity {
 	void destroy() {
 		thrust(false);
 		rotateStop();
-		Sound.SHIP_EXPLODE.play();
+		Sound.EXPLODE_PLAYER.play();
 		super.destroy();
 	}
 }

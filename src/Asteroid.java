@@ -25,18 +25,22 @@ import javax.imageio.ImageIO;
  */
 
 public final class Asteroid extends Entity {
+	private enum Size { LARGE, MEDIUM, SMALL }
 	private static final List<Asteroid> ASTEROIDS = new ArrayList<Asteroid>();
 	private static final int MAX_ASTEROIDS = 8, MIN_SPEED = 2, MAX_SPEED = 8;
-	private static final byte SIZE_LARGE = 0, SIZE_MEDIUM = 1, SIZE_SMALL = 2;
 	private static Image[] image = new Image[3];
 	private static final Random random = new Random();
-	private byte size;
+	private Size size;
 	private AffineTransform trans = new AffineTransform();
 	
 	private Asteroid(float x, float y, int rotationDeg, int velocity) {
+		this(x, y, rotationDeg, velocity, Size.LARGE);
+	}
+	
+	private Asteroid(float x, float y, int rotationDeg, int velocity, Size size) {
 		super(x, y, rotationDeg, velocity);
-		size = SIZE_LARGE;
-		radius = image[size].getWidth(null) / 2;
+		this.size = size;
+		radius = image[size.ordinal()].getWidth(null) / 2;
 	}
 
 	/**
@@ -46,9 +50,9 @@ public final class Asteroid extends Entity {
 	 * @throws IOException If asteroid images could not be read.
 	 */
 	static void generateAsteroids(int level) throws IOException {
-		image[SIZE_LARGE] = ImageIO.read(Asteroid.class.getClassLoader().getResource("img/asteroid" + level + "_large.png"));
-		image[SIZE_MEDIUM] = ImageIO.read(Asteroid.class.getClassLoader().getResource("img/asteroid" + level + "_medium.png"));
-		image[SIZE_SMALL] = ImageIO.read(Asteroid.class.getClassLoader().getResource("img/asteroid" + level + "_small.png"));
+		image[Size.LARGE.ordinal()] = ImageIO.read(Asteroid.class.getClassLoader().getResource("img/asteroid" + level + "_large.png"));
+		image[Size.MEDIUM.ordinal()] = ImageIO.read(Asteroid.class.getClassLoader().getResource("img/asteroid" + level + "_medium.png"));
+		image[Size.SMALL.ordinal()] = ImageIO.read(Asteroid.class.getClassLoader().getResource("img/asteroid" + level + "_small.png"));
 		while (ASTEROIDS.size() < MAX_ASTEROIDS) {
 			boolean spawnTopBottom = random.nextBoolean(); // Whether to spawn along the top/bottom instead of left/right edges.
 			ASTEROIDS.add(new Asteroid(spawnTopBottom ? random.nextInt(GameView.VIEW_WIDTH) : 0,
@@ -67,13 +71,35 @@ public final class Asteroid extends Entity {
 		removeDestroyed();
 		for (Asteroid a : ASTEROIDS) {
 			a.calculateMotion();
-			g2d.drawImage(image[a.size], a.getTransform(), null);
+			g2d.drawImage(image[a.size.ordinal()], a.getTransform(), null);
 		}
 	}
 
 	@Override
 	void destroy() {
-		Sound.ROCK_EXPLODE.play();
+		Size newSize = null;
+		switch (size) {
+		case LARGE:
+			Sound.EXPLODE_LARGE.play();
+			newSize = Size.MEDIUM;
+			break;
+		case MEDIUM:
+			Sound.EXPLODE_MEDIUM.play();
+			newSize = Size.SMALL;
+			break;
+		case SMALL:
+			Sound.EXPLODE_SMALL.play();
+			break;
+		}
+		if (newSize != null) {
+			// Create smaller rocks
+			int newDir, newVel;
+			for (int x = 1; x <= 2; x++) {
+				newDir = random.nextInt(360);
+				newVel = MIN_SPEED + random.nextInt(1 + MAX_SPEED - MIN_SPEED);
+				ASTEROIDS.add(new Asteroid(posX, posY, newDir, newVel, newSize));
+			}
+		}
 		super.destroy();
 	}
 
