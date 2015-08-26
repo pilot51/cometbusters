@@ -22,6 +22,8 @@ import java.awt.Toolkit;
 import java.awt.event.KeyEvent;
 import java.awt.event.KeyListener;
 import java.io.IOException;
+import java.util.Timer;
+import java.util.TimerTask;
 
 import javax.imageio.ImageIO;
 import javax.swing.JComponent;
@@ -30,6 +32,8 @@ public class GameView extends JComponent implements KeyListener {
 	private static final long serialVersionUID = 1L;
 	
 	static final int VIEW_WIDTH = 1024, VIEW_HEIGHT = 768;
+	/** Number of simulations per second. */
+	private static final int TICK_RATE = 100;
 	private Ship ship;
 	private Image imgBg;
 	private boolean[] keysPressed = new boolean[1024];
@@ -47,23 +51,45 @@ public class GameView extends JComponent implements KeyListener {
 		Asteroid.generateAsteroids(1);
 		addKeyListener(this);
 		setFocusable(true);
+		new Timer().schedule(new TimerTask() {
+			@Override
+			public void run() {
+				simulate();
+				repaint();
+			}
+		}, 1000 / TICK_RATE, 1000 / TICK_RATE);
 	}
 	
 	@Override
 	protected void paintComponent(Graphics g) {
 		super.paintComponent(g);
-		for (Asteroid a : Asteroid.getAsteroids()) {
-			if (ship.isContacting(a)) {
-				ship.collide(a);
-				break;
-			}
-		}
 		Graphics2D g2d = (Graphics2D)g;
 		g2d.drawImage(imgBg, 0, 0, null);
 		Asteroid.drawAsteroids(g2d);
 		ship.drawShip(g2d);
 		Bullet.drawBullets(g2d, ship);
-		repaint();
+	}
+	
+	private void simulate() {
+		if (!ship.isDestroyed()) {
+			ship.calculateMotion();
+		}
+		for (int i = Asteroid.getAsteroids().size() - 1; i >= 0; i--) {
+			Asteroid a = Asteroid.getAsteroids().get(i);
+			a.calculateMotion();
+			if (ship.isContacting(a)) {
+				ship.collide(a);
+			}
+		}
+		for (int i = ship.getBullets().size() - 1; i >= 0; i--) {
+			Bullet b = ship.getBullets().get(i);
+			b.calculateMotion();
+			if (b.isDestroyed()) {
+				synchronized (ship.getBullets()) {
+					ship.getBullets().remove(i);
+				}
+			}
+		}
 	}
 	
 	@Override

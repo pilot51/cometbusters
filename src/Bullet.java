@@ -72,9 +72,12 @@ public final class Bullet extends Entity {
 	}
 	
 	static void drawBullets(Graphics2D g2d, Ship ship) {
-		for (Bullet b : ship.getBullets()) {
-			b.calculateMotion();
-			g2d.drawImage(image, b.getTransform(), null);
+		synchronized (ship.getBullets()) {
+			for (Bullet b : ship.getBullets()) {
+				if (!b.isDestroyed()) {
+					g2d.drawImage(image, b.getTransform(), null);
+				}
+			}
 		}
 	}
 	

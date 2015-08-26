@@ -68,10 +68,12 @@ public final class Asteroid extends Entity {
 	}
 	
 	static void drawAsteroids(Graphics2D g2d) {
-		removeDestroyed();
-		for (Asteroid a : ASTEROIDS) {
-			a.calculateMotion();
-			g2d.drawImage(image[a.size.ordinal()], a.getTransform(), null);
+		synchronized (ASTEROIDS) {
+			for (Asteroid a : ASTEROIDS) {
+				if (!a.isDestroyed()) {
+					g2d.drawImage(image[a.size.ordinal()], a.getTransform(), null);
+				}
+			}
 		}
 	}
 
@@ -91,24 +93,19 @@ public final class Asteroid extends Entity {
 			Sound.EXPLODE_SMALL.play();
 			break;
 		}
-		if (newSize != null) {
-			// Create smaller rocks
-			int newDir, newVel;
-			for (int x = 1; x <= 2; x++) {
-				newDir = random.nextInt(360);
-				newVel = MIN_SPEED + random.nextInt(1 + MAX_SPEED - MIN_SPEED);
-				ASTEROIDS.add(new Asteroid(posX, posY, newDir, newVel, newSize));
+		synchronized (ASTEROIDS) {
+			if (newSize != null) {
+				// Create smaller rocks
+				int newDir, newVel;
+				for (int x = 1; x <= 2; x++) {
+					newDir = random.nextInt(360);
+					newVel = MIN_SPEED + random.nextInt(1 + MAX_SPEED - MIN_SPEED);
+					ASTEROIDS.add(new Asteroid(posX, posY, newDir, newVel, newSize));
+				}
 			}
+			ASTEROIDS.remove(this);
 		}
 		super.destroy();
-	}
-
-	private static void removeDestroyed() {
-		for (int i = ASTEROIDS.size() - 1; i >= 0; i--) {
-			if (ASTEROIDS.get(i).isDestroyed()) {
-				ASTEROIDS.remove(i);
-			}
-		}
 	}
 
 	static List<Asteroid> getAsteroids() {

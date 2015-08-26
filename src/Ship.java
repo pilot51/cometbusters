@@ -49,7 +49,6 @@ public final class Ship extends Entity {
 	
 	void drawShip(Graphics2D g2d) {
 		if (isDestroyed()) return;
-		calculateMotion();
 		if (isAccelerating) {
 			g2d.drawImage(getThrustImage(), getThrustTransform(), null);
 		}
@@ -107,11 +106,6 @@ public final class Ship extends Entity {
 	 * @return List of live {@link Bullet}'s fired from this ship.
 	 */
 	List<Bullet> getBullets() {
-		for (int i = BULLETS.size() - 1; i >= 0; i--) {
-			if (BULLETS.get(i).isDestroyed()) {
-				BULLETS.remove(i);
-			}
-		}
 		return BULLETS;
 	}
 
