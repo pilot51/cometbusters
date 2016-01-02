@@ -25,7 +25,7 @@ import javax.imageio.ImageIO;
  */
 
 public final class Asteroid extends Entity {
-	private enum Size { LARGE, MEDIUM, SMALL }
+	public enum Size { LARGE, MEDIUM, SMALL }
 	private static final List<Asteroid> ASTEROIDS = new ArrayList<Asteroid>();
 	private static final int MAX_ASTEROIDS = 8, MIN_SPEED = 2, MAX_SPEED = 8;
 	private static Image[] image = new Image[3];
@@ -110,5 +110,9 @@ public final class Asteroid extends Entity {
 
 	static List<Asteroid> getAsteroids() {
 		return ASTEROIDS;
+	}
+	
+	public Size getSize() {
+		return size;
 	}
 }

@@ -38,7 +38,6 @@ public class GameView extends JComponent implements KeyListener {
 	private static final int TICK_RATE = 100;
 	private Ship ship;
 	private Image imgBg;
-	private Integer score = 0;
 	private boolean[] keysPressed = new boolean[1024];
 	
 	/**
@@ -68,11 +67,10 @@ public class GameView extends JComponent implements KeyListener {
 		super.paintComponent(g);
 		Graphics2D g2d = (Graphics2D)g;
 		g2d.drawImage(imgBg, 0, 0, null);
-		g2d.setColor(Color.RED);
-		int fontsize = 30;
-        Font font = new Font("Arial",Font.PLAIN,fontsize);
-        g2d.setFont(font);
-		g2d.drawString(score.toString(), 50, 80);
+		g2d.setColor(Color.decode("#00FFFF"));
+		int fontSize = 18;
+        g2d.setFont(new Font("Arial",Font.PLAIN, fontSize));
+		g2d.drawString(String.format("%07d", ship.getScore()), 30, 30);
 		Asteroid.drawAsteroids(g2d);
 		ship.drawShip(g2d);
 		Bullet.drawBullets(g2d, ship);
@@ -92,8 +90,23 @@ public class GameView extends JComponent implements KeyListener {
 		for (int i = ship.getBullets().size() - 1; i >= 0; i--) {
 			Bullet b = ship.getBullets().get(i);
 			b.calculateMotion();
-			if (!b.isDestroyed() && b.hitAsteroid()) {
-				this.score += 1;
+			if ( b.hitAsteroid() ) {
+				Asteroid.Size asteroidSize = b.getAsteroidSizeThatWasHit();
+				int addedScore = 0;
+				
+				switch(asteroidSize) {
+				case LARGE:
+					addedScore += 20;
+					break;
+				case MEDIUM:
+					addedScore += 50;
+					break;
+				case SMALL:
+					addedScore += 100;
+					break;
+				}
+				
+				ship.setScore(ship.getScore() + addedScore);
 				b.hitAsteroid(false);
 			}
 			if (b.isDestroyed()) {

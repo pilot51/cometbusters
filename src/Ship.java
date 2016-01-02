@@ -31,6 +31,7 @@ public final class Ship extends Entity {
 	private int thrustRadius;
 	private AffineTransform trans = new AffineTransform();
 	private final List<Bullet> BULLETS = new ArrayList<Bullet>(MAX_BULLETS);
+	private Integer score;
 	
 	/**
 	 * Creates a new ship.
@@ -45,6 +46,7 @@ public final class Ship extends Entity {
 		thrustImages = new Image[] {ImageIO.read(getClass().getClassLoader().getResource("img/thrust1.png")),
 		                            ImageIO.read(getClass().getClassLoader().getResource("img/thrust2.png"))};
 		thrustRadius = thrustImages[0].getWidth(null) / 2;
+		score = 0;
 	}
 	
 	void drawShip(Graphics2D g2d) {
@@ -115,5 +117,13 @@ public final class Ship extends Entity {
 		rotateStop();
 		Sound.EXPLODE_PLAYER.play();
 		super.destroy();
+	}
+	
+	public Integer getScore() {
+		return score;
+	}
+
+	public void setScore(Integer score) {
+		this.score = score;
 	}
 }
