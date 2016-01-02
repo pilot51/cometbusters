@@ -24,6 +24,7 @@ import javax.imageio.ImageIO;
 public final class Bullet extends Entity {
 	private static Image image;
 	private static int radius;
+	private static boolean hitAsteroid = false;
 	private static final long DURATION = 2000;
 	private static final int SPEED = 15;
 	private long timeCreated;
@@ -66,6 +67,7 @@ public final class Bullet extends Entity {
 		for (Asteroid a : Asteroid.getAsteroids()) {
 			if (isContacting(a)) {
 				collide(a);
+				hitAsteroid = true;
 				break;
 			}
 		}
@@ -86,6 +88,14 @@ public final class Bullet extends Entity {
 	 */
 	static int getBulletRadius() {
 		return radius;
+	}
+	
+	public boolean hitAsteroid() {
+		return hitAsteroid;
+	}
+	
+	public void hitAsteroid(boolean hitAsteroid) {
+		this.hitAsteroid = hitAsteroid;
 	}
 	
 	private AffineTransform getTransform() {
