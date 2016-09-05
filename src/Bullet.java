@@ -24,8 +24,8 @@ import javax.imageio.ImageIO;
 public final class Bullet extends Entity {
 	private static Image image;
 	private static int radius;
-	private boolean hitAsteroid = false;
-	private Asteroid.Size asteroidSizeThatWasHit;
+	/** Size of asteroid that this bullet hit. Null if it has not hit an asteroid. */
+	private Asteroid.Size hitAsteroidSize;
 	private static final long DURATION = 2000;
 	private static final int SPEED = 15;
 	private long timeCreated;
@@ -68,8 +68,7 @@ public final class Bullet extends Entity {
 		for (Asteroid a : Asteroid.getAsteroids()) {
 			if (isContacting(a)) {
 				collide(a);
-				hitAsteroid = true;
-				asteroidSizeThatWasHit = a.getSize();
+				hitAsteroidSize = a.getSize();
 				break;
 			}
 		}
@@ -92,24 +91,19 @@ public final class Bullet extends Entity {
 		return radius;
 	}
 	
-	public boolean hitAsteroid() {
-		return hitAsteroid;
-	}
-	
-	public void hitAsteroid(boolean hitAsteroid) {
-		this.hitAsteroid = hitAsteroid;
-	}
-	
 	private AffineTransform getTransform() {
 		trans.setToTranslation(posX - radius, posY - radius);
 		return trans;
 	}
-	
-	public Asteroid.Size getAsteroidSizeThatWasHit() {
-		return asteroidSizeThatWasHit;
+
+	/**
+	 * @return Size of asteroid that this bullet hit, or null if it has not hit an asteroid.
+	 */
+	public Asteroid.Size getHitAsteroidSize() {
+		return hitAsteroidSize;
 	}
 
-	public void setAsteroidSizeThatWasHit(Asteroid.Size asteroidSizeThatWasHit) {
-		this.asteroidSizeThatWasHit = asteroidSizeThatWasHit;
+	public void setHitAsteroidSize(Asteroid.Size hitAsteroidSize) {
+		this.hitAsteroidSize = hitAsteroidSize;
 	}
 }

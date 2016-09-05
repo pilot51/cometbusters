@@ -14,12 +14,12 @@
  * limitations under the License.
  */
 
+import java.awt.Color;
 import java.awt.Dimension;
+import java.awt.Font;
 import java.awt.Graphics;
 import java.awt.Graphics2D;
 import java.awt.Image;
-import java.awt.Color;
-import java.awt.Font;
 import java.awt.Toolkit;
 import java.awt.event.KeyEvent;
 import java.awt.event.KeyListener;
@@ -58,7 +58,7 @@ public class GameView extends JComponent implements KeyListener {
 			public void run() {
 				simulate();
 				repaint();
-			} 
+			}
 		}, 1000 / TICK_RATE, 1000 / TICK_RATE);
 	}
 	
@@ -68,8 +68,7 @@ public class GameView extends JComponent implements KeyListener {
 		Graphics2D g2d = (Graphics2D)g;
 		g2d.drawImage(imgBg, 0, 0, null);
 		g2d.setColor(Color.decode("#00FFFF"));
-		int fontSize = 18;
-        g2d.setFont(new Font("Arial",Font.PLAIN, fontSize));
+		g2d.setFont(new Font("Arial", Font.PLAIN, 18));
 		g2d.drawString(String.format("%07d", ship.getScore()), 30, 30);
 		Asteroid.drawAsteroids(g2d);
 		ship.drawShip(g2d);
@@ -90,24 +89,20 @@ public class GameView extends JComponent implements KeyListener {
 		for (int i = ship.getBullets().size() - 1; i >= 0; i--) {
 			Bullet b = ship.getBullets().get(i);
 			b.calculateMotion();
-			if ( b.hitAsteroid() ) {
-				Asteroid.Size asteroidSize = b.getAsteroidSizeThatWasHit();
-				int addedScore = 0;
-				
-				switch(asteroidSize) {
+			Asteroid.Size hitAsteroidSize = b.getHitAsteroidSize();
+			if (hitAsteroidSize != null) {
+				switch (hitAsteroidSize) {
 				case LARGE:
-					addedScore += 20;
+					ship.addScore(20);
 					break;
 				case MEDIUM:
-					addedScore += 50;
+					ship.addScore(50);
 					break;
 				case SMALL:
-					addedScore += 100;
+					ship.addScore(100);
 					break;
 				}
-				
-				ship.setScore(ship.getScore() + addedScore);
-				b.hitAsteroid(false);
+				b.setHitAsteroidSize(null);
 			}
 			if (b.isDestroyed()) {
 				synchronized (ship.getBullets()) {
@@ -115,7 +110,7 @@ public class GameView extends JComponent implements KeyListener {
 				}
 			}
 		}
-	}    
+	}
 	
 	@Override
 	public void keyPressed(KeyEvent e) {
