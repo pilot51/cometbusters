@@ -73,6 +73,7 @@ public class GameView extends JComponent implements KeyListener {
 		Asteroid.drawAsteroids(g2d);
 		ship.drawShip(g2d);
 		Bullet.drawBullets(g2d, ship);
+		getToolkit().sync();
 	}
 	
 	private void simulate() {
