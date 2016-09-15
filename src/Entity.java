@@ -155,13 +155,28 @@ public abstract class Entity {
 	}
 
 	/**
-	 * Sets this entity as destroyed.
+	 * Sets this entity as destroyed (not active).
+	 * @see #undestroy()
 	 * @see #isDestroyed()
 	 */
 	void destroy() {
 		isDestroyed = true;
 	}
 
+	/**
+	 * Sets this entity as not destroyed (active).
+	 * @see #destroy()
+	 * @see #isDestroyed()
+	 */
+	void undestroy() {
+		isDestroyed = false;
+	}
+
+	/**
+	 * @return True if this entity is destroyed (not active), false if not.
+	 * @see #destroy()
+	 * @see #undestroy()
+	 */
 	final boolean isDestroyed() {
 		return isDestroyed;
 	}

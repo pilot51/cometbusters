@@ -31,16 +31,15 @@ public final class Ship extends Entity {
 	private int thrustRadius;
 	private AffineTransform trans = new AffineTransform();
 	private final List<Bullet> BULLETS = new ArrayList<Bullet>(MAX_BULLETS);
-	private Integer score = 0;
+	private int score = 0;
 	
 	/**
-	 * Creates a new ship.
-	 * @param x Initial x-position.
-	 * @param y Initial y-position.
+	 * Creates a new ship, initially not spawned. Call {@link #spawn(int, int)} to spawn the ship.
 	 * @throws IOException if thrust images could not be read.
 	 */
-	Ship(int x, int y) throws IOException {
-		super(x, y, 0, 0, THRUST, ROTATE_SPEED);
+	Ship() throws IOException {
+		super(0, 0, 0, 0, THRUST, ROTATE_SPEED);
+		super.destroy();
 		image = ImageIO.read(getClass().getClassLoader().getResource("img/ship.png"));
 		radius = image.getWidth(null) / 2;
 		thrustImages = new Image[] {ImageIO.read(getClass().getClassLoader().getResource("img/thrust1.png")),
@@ -110,19 +109,41 @@ public final class Ship extends Entity {
 		return BULLETS;
 	}
 
-	@Override
-	void destroy() {
+	/**
+	 * Spawns this ship at the specified coordinates, motionless and pointed up.
+	 */
+	void spawn(int x, int y) {
+		posX = x;
+		posY = y;
+		rotateDeg = 0;
+		velX = 0;
+		velY = 0;
+		super.undestroy();
+	}
+
+	/**
+	 * Removes this ship from the field.
+	 */
+	void terminate() {
 		thrust(false);
 		rotateStop();
-		Sound.EXPLODE_PLAYER.play();
 		super.destroy();
 	}
 
-	public Integer getScore() {
+	/**
+	 * Destroys this ship with an explosion.
+	 */
+	@Override
+	void destroy() {
+		terminate();
+		Sound.EXPLODE_PLAYER.play();
+	}
+
+	public int getScore() {
 		return score;
 	}
 
-	public void addScore(Integer score) {
+	public void addScore(int score) {
 		this.score += score;
 	}
 }

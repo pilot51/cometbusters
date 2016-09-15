@@ -36,7 +36,9 @@ public class Main extends JFrame {
 		setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
 		setIconImage(new ImageIcon(getClass().getClassLoader().getResource("img/icon.png")).getImage());
 		try {
-			add(new GameView());
+			GameView gv = new GameView();
+			setJMenuBar(gv.createMenu());
+			add(gv);
 			pack();
 			setVisible(true);
 		} catch (IOException e) {

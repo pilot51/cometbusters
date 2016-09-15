@@ -46,10 +46,12 @@ public final class Asteroid extends Entity {
 	/**
 	 * Loads asteroid images for provided level and randomly spawns several
 	 * large asteroids at screen edges with randomized speed and direction.
+	 * Clears any existing asteroids prior to generation.
 	 * @param level The level for which to generate asteroids.
 	 * @throws IOException If asteroid images could not be read.
 	 */
 	static void generateAsteroids(int level) throws IOException {
+		ASTEROIDS.clear();
 		image[Size.LARGE.ordinal()] = ImageIO.read(Asteroid.class.getClassLoader().getResource("img/asteroid" + level + "_large.png"));
 		image[Size.MEDIUM.ordinal()] = ImageIO.read(Asteroid.class.getClassLoader().getResource("img/asteroid" + level + "_medium.png"));
 		image[Size.SMALL.ordinal()] = ImageIO.read(Asteroid.class.getClassLoader().getResource("img/asteroid" + level + "_small.png"));

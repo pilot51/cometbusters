@@ -38,23 +38,44 @@ public enum Sound {
 
 	private String filename;
 	private SoundPlayer player;
+	private static boolean isEnabled = true;
 
 	private Sound(String filename) {
 		this.filename = filename;
 	}
 
+	/**
+	 * @return True if sound has been enabled, false if disabled.
+	 */
+	public static boolean toggleSound() {
+		isEnabled ^= true;
+		if (!isEnabled) {
+			for (Sound s : values()) {
+				s.stop();
+			}
+		}
+		return isEnabled;
+	}
+
 	void play() {
-		new SoundPlayer(filename, false).start();
+		if (isEnabled) {
+			player = new SoundPlayer(filename, false);
+			player.start();
+		}
 	}
 
 	void loop() {
-		player = new SoundPlayer(filename, true);
-		player.start();
+		if (isEnabled) {
+			player = new SoundPlayer(filename, true);
+			player.start();
+		}
 	}
 
 	void stop() {
-		player.stop = true;
-		player = null;
+		if (player != null) {
+			player.stop = true;
+			player = null;
+		}
 	}
 
 	public static class SoundPlayer extends Thread {

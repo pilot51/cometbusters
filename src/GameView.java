@@ -21,6 +21,8 @@ import java.awt.Graphics;
 import java.awt.Graphics2D;
 import java.awt.Image;
 import java.awt.Toolkit;
+import java.awt.event.ActionEvent;
+import java.awt.event.ActionListener;
 import java.awt.event.KeyEvent;
 import java.awt.event.KeyListener;
 import java.io.IOException;
@@ -28,7 +30,10 @@ import java.util.Timer;
 import java.util.TimerTask;
 
 import javax.imageio.ImageIO;
+import javax.swing.Box;
+import javax.swing.JButton;
 import javax.swing.JComponent;
+import javax.swing.JMenuBar;
 
 public class GameView extends JComponent implements KeyListener {
 	private static final long serialVersionUID = 1L;
@@ -39,6 +44,10 @@ public class GameView extends JComponent implements KeyListener {
 	private Ship ship;
 	private Image imgBg;
 	private boolean[] keysPressed = new boolean[1024];
+	/** Indicates if simulation and rendering is paused. */
+	private boolean isPaused;
+	/** Indicates if gameplay has started. */
+	private boolean isStarted;
 	
 	/**
 	 * Creates the game view and objects required within it.
@@ -47,7 +56,7 @@ public class GameView extends JComponent implements KeyListener {
 	GameView() throws IOException {
 		setPreferredSize(new Dimension(VIEW_WIDTH, VIEW_HEIGHT));
 		imgBg = ImageIO.read(getClass().getClassLoader().getResource("img/background.png"));
-		ship = new Ship(VIEW_WIDTH / 2, VIEW_HEIGHT / 2);
+		ship = new Ship();
 		Sound.init();
 		Bullet.init();
 		Asteroid.generateAsteroids(1);
@@ -56,8 +65,10 @@ public class GameView extends JComponent implements KeyListener {
 		new Timer().schedule(new TimerTask() {
 			@Override
 			public void run() {
-				simulate();
-				repaint();
+				if (!isPaused) {
+					simulate();
+					repaint();
+				}
 			}
 		}, 1000 / TICK_RATE, 1000 / TICK_RATE);
 	}
@@ -76,6 +87,106 @@ public class GameView extends JComponent implements KeyListener {
 		getToolkit().sync();
 	}
 	
+	JMenuBar createMenu() {
+		JMenuBar menuBar = new JMenuBar();
+		menuBar.setFocusable(false);
+		JButton button1 = new JButton("1");
+		button1.setMnemonic(KeyEvent.VK_1);
+		button1.setFocusable(false);
+		menuBar.add(button1);
+		JButton button2 = new JButton("2");
+		button2.setMnemonic(KeyEvent.VK_2);
+		button2.setFocusable(false);
+		menuBar.add(button2);
+		JButton button3 = new JButton("3");
+		button3.setMnemonic(KeyEvent.VK_3);
+		button3.setFocusable(false);
+		menuBar.add(button3);
+		JButton button4 = new JButton("4");
+		button4.setMnemonic(KeyEvent.VK_4);
+		button4.setFocusable(false);
+		menuBar.add(button4);
+		menuBar.add(Box.createHorizontalStrut(10));
+		JButton buttonStart = new JButton("Start");
+		buttonStart.setMnemonic(KeyEvent.VK_T);
+		buttonStart.setFocusable(false);
+		buttonStart.addActionListener(new ActionListener() {
+			@Override
+			public void actionPerformed(ActionEvent arg0) {
+				isStarted ^= true;
+				if (isStarted) {
+					startGame();
+				} else {
+					stopGame();
+				}
+				buttonStart.setText(isStarted ? "Stop" : "Start");
+			}
+		});
+		menuBar.add(buttonStart);
+		JButton buttonPlayers = new JButton("Players");
+		buttonPlayers.setMnemonic(KeyEvent.VK_L);
+		buttonPlayers.setFocusable(false);
+		menuBar.add(buttonPlayers);
+		JButton buttonGame = new JButton("Game");
+		buttonGame.setMnemonic(KeyEvent.VK_G);
+		buttonGame.setFocusable(false);
+		menuBar.add(buttonGame);
+		JButton buttonPause = new JButton("Pause");
+		buttonPause.setMnemonic(KeyEvent.VK_P);
+		buttonPause.setFocusable(false);
+		buttonPause.addActionListener(new ActionListener() {
+			@Override
+			public void actionPerformed(ActionEvent e) {
+				// FIXME: Bullets alive during pause die prematurely after unpause.
+				isPaused ^= true;
+				buttonPause.setMnemonic(isPaused ? KeyEvent.VK_C : KeyEvent.VK_P);
+				buttonPause.setText(isPaused ? "Continue" : "Pause");
+			}
+		});
+		menuBar.add(buttonPause);
+		JButton buttonSound = new JButton("Sound");
+		buttonSound.setMnemonic(KeyEvent.VK_S);
+		buttonSound.setFocusable(false);
+		buttonSound.addActionListener(new ActionListener() {
+			@Override
+			public void actionPerformed(ActionEvent e) {
+				buttonSound.setText(Sound.toggleSound() ? "Sound" : "(sound)");
+			}
+		});
+		menuBar.add(buttonSound);
+		JButton buttonMusic = new JButton("Music");
+		buttonMusic.setMnemonic(KeyEvent.VK_M);
+		buttonMusic.setFocusable(false);
+		menuBar.add(buttonMusic);
+		JButton buttonHelp = new JButton("Help");
+		buttonHelp.setMnemonic(KeyEvent.VK_H);
+		buttonHelp.setFocusable(false);
+		menuBar.add(buttonHelp);
+		JButton buttonAbout = new JButton("About");
+		buttonAbout.setMnemonic(KeyEvent.VK_A);
+		buttonAbout.setFocusable(false);
+		menuBar.add(buttonAbout);
+		return menuBar;
+	}
+
+	private void startGame() {
+		try {
+			Asteroid.generateAsteroids(1);
+			ship.spawn(VIEW_WIDTH / 2, VIEW_HEIGHT / 2);
+		} catch (IOException e) {
+			e.printStackTrace();
+		}
+	}
+
+	private void stopGame() {
+		ship.terminate();
+		try {
+			Asteroid.generateAsteroids(1);
+		} catch (IOException e) {
+			e.printStackTrace();
+		}
+	}
+
 	private void simulate() {
 		if (!ship.isDestroyed()) {
 			ship.calculateMotion();
