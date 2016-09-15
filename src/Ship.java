@@ -119,6 +119,7 @@ public final class Ship extends Entity {
 		velX = 0;
 		velY = 0;
 		super.undestroy();
+		Sound.SPAWN.play();
 	}
 
 	/**
