@@ -40,7 +40,7 @@ public final class Bullet extends Entity {
 	Bullet(float x, float y, int deg) {
 		super(x, y, deg, SPEED);
 		super.radius = radius;
-		timeCreated = System.currentTimeMillis();
+		timeCreated = Simulation.getSimulationTime();
 	}
 	
 	/**
@@ -53,7 +53,7 @@ public final class Bullet extends Entity {
 	}
 	
 	void calculateMotion() {
-		if (System.currentTimeMillis() - timeCreated > DURATION) {
+		if (Simulation.getSimulationTime() - timeCreated > DURATION) {
 			destroy();
 			return;
 		}

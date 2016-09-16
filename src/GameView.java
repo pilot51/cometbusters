@@ -39,15 +39,9 @@ public class GameView extends JComponent implements KeyListener {
 	private static final long serialVersionUID = 1L;
 	
 	static final int VIEW_WIDTH = 1024, VIEW_HEIGHT = 768;
-	/** Number of simulations per second. */
-	private static final int TICK_RATE = 100;
 	private Ship ship;
 	private Image imgBg;
 	private boolean[] keysPressed = new boolean[1024];
-	/** Indicates if simulation and rendering is paused. */
-	private boolean isPaused;
-	/** Indicates if gameplay has started. */
-	private boolean isStarted;
 	
 	/**
 	 * Creates the game view and objects required within it.
@@ -65,12 +59,12 @@ public class GameView extends JComponent implements KeyListener {
 		new Timer().schedule(new TimerTask() {
 			@Override
 			public void run() {
-				if (!isPaused) {
-					simulate();
+				if (!Simulation.isPaused) {
+					Simulation.simulate(ship);
 					repaint();
 				}
 			}
-		}, 1000 / TICK_RATE, 1000 / TICK_RATE);
+		}, 1000 / Simulation.TICK_RATE, 1000 / Simulation.TICK_RATE);
 	}
 	
 	@Override
@@ -113,13 +107,13 @@ public class GameView extends JComponent implements KeyListener {
 		buttonStart.addActionListener(new ActionListener() {
 			@Override
 			public void actionPerformed(ActionEvent arg0) {
-				isStarted ^= true;
-				if (isStarted) {
+				Simulation.isStarted ^= true;
+				if (Simulation.isStarted) {
 					startGame();
 				} else {
 					stopGame();
 				}
-				buttonStart.setText(isStarted ? "Stop" : "Start");
+				buttonStart.setText(Simulation.isStarted ? "Stop" : "Start");
 			}
 		});
 		menuBar.add(buttonStart);
@@ -137,10 +131,9 @@ public class GameView extends JComponent implements KeyListener {
 		buttonPause.addActionListener(new ActionListener() {
 			@Override
 			public void actionPerformed(ActionEvent e) {
-				// FIXME: Bullets alive during pause die prematurely after unpause.
-				isPaused ^= true;
-				buttonPause.setMnemonic(isPaused ? KeyEvent.VK_C : KeyEvent.VK_P);
-				buttonPause.setText(isPaused ? "Continue" : "Pause");
+				Simulation.isPaused ^= true;
+				buttonPause.setMnemonic(Simulation.isPaused ? KeyEvent.VK_C : KeyEvent.VK_P);
+				buttonPause.setText(Simulation.isPaused ? "Continue" : "Pause");
 			}
 		});
 		menuBar.add(buttonPause);
@@ -186,47 +179,10 @@ public class GameView extends JComponent implements KeyListener {
 			e.printStackTrace();
 		}
 	}
-
-	private void simulate() {
-		if (!ship.isDestroyed()) {
-			ship.calculateMotion();
-		}
-		for (int i = Asteroid.getAsteroids().size() - 1; i >= 0; i--) {
-			Asteroid a = Asteroid.getAsteroids().get(i);
-			a.calculateMotion();
-			if (ship.isContacting(a)) {
-				ship.collide(a);
-			}
-		}
-		for (int i = ship.getBullets().size() - 1; i >= 0; i--) {
-			Bullet b = ship.getBullets().get(i);
-			b.calculateMotion();
-			Asteroid.Size hitAsteroidSize = b.getHitAsteroidSize();
-			if (hitAsteroidSize != null) {
-				switch (hitAsteroidSize) {
-				case LARGE:
-					ship.addScore(20);
-					break;
-				case MEDIUM:
-					ship.addScore(50);
-					break;
-				case SMALL:
-					ship.addScore(100);
-					break;
-				}
-				b.setHitAsteroidSize(null);
-			}
-			if (b.isDestroyed()) {
-				synchronized (ship.getBullets()) {
-					ship.getBullets().remove(i);
-				}
-			}
-		}
-	}
 	
 	@Override
 	public void keyPressed(KeyEvent e) {
-		if (e.isConsumed() || ship.isDestroyed()) return;
+		if (e.isConsumed() || ship.isDestroyed() || Simulation.isPaused) return;
 		keysPressed[e.getKeyCode()] = true;
 		switch (e.getKeyCode()) {
 			case KeyEvent.VK_UP:

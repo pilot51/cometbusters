@@ -32,6 +32,7 @@ public final class Ship extends Entity {
 	private AffineTransform trans = new AffineTransform();
 	private final List<Bullet> BULLETS = new ArrayList<Bullet>(MAX_BULLETS);
 	private int score = 0;
+	private long birthTime, aliveTime;
 	
 	/**
 	 * Creates a new ship, initially not spawned. Call {@link #spawn(int, int)} to spawn the ship.
@@ -49,6 +50,7 @@ public final class Ship extends Entity {
 	
 	void drawShip(Graphics2D g2d) {
 		if (isDestroyed()) return;
+		aliveTime = Simulation.getSimulationTime() - birthTime;
 		if (isAccelerating) {
 			g2d.drawImage(getThrustImage(), getThrustTransform(), null);
 		}
@@ -64,8 +66,13 @@ public final class Ship extends Entity {
 	}
 	
 	private AffineTransform getTransform() {
-		trans.setToTranslation(posX - radius, posY - radius);
+		double scale = 1;
+		if (aliveTime < 300) {
+			scale = aliveTime / 300d;
+		}
+		trans.setToTranslation(posX - (radius * scale), posY - (radius * scale));
 		trans.rotate(Math.toRadians(rotateDeg), radius, radius);
+		trans.scale(scale, scale);
 		return trans;
 	}
 	
@@ -119,6 +126,7 @@ public final class Ship extends Entity {
 		velX = 0;
 		velY = 0;
 		super.undestroy();
+		birthTime = Simulation.getSimulationTime();
 		Sound.SPAWN.play();
 	}
 
