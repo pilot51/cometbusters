@@ -20,7 +20,6 @@ import java.awt.Font;
 import java.awt.Graphics;
 import java.awt.Graphics2D;
 import java.awt.Image;
-import java.awt.Toolkit;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
 import java.awt.event.KeyEvent;
@@ -41,7 +40,6 @@ public class GameView extends JComponent implements KeyListener {
 	static final int VIEW_WIDTH = 1024, VIEW_HEIGHT = 768;
 	private Ship ship;
 	private Image imgBg;
-	private boolean[] keysPressed = new boolean[1024];
 	
 	/**
 	 * Creates the game view and objects required within it.
@@ -179,11 +177,10 @@ public class GameView extends JComponent implements KeyListener {
 			e.printStackTrace();
 		}
 	}
-	
+
 	@Override
 	public void keyPressed(KeyEvent e) {
 		if (e.isConsumed() || ship.isDestroyed() || Simulation.isPaused) return;
-		keysPressed[e.getKeyCode()] = true;
 		switch (e.getKeyCode()) {
 			case KeyEvent.VK_UP:
 				ship.thrust(true);
@@ -203,9 +200,6 @@ public class GameView extends JComponent implements KeyListener {
 	@Override
 	public void keyReleased(KeyEvent e) {
 		if (e.isConsumed()) return;
-		KeyEvent nextPress = (KeyEvent)Toolkit.getDefaultToolkit().getSystemEventQueue().peekEvent(KeyEvent.KEY_PRESSED);
-		if (nextPress != null && nextPress.getWhen() == e.getWhen()) return;
-		keysPressed[e.getKeyCode()] = false;
 		switch (e.getKeyCode()) {
 			case KeyEvent.VK_UP:
 				ship.thrust(false);
