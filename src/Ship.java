@@ -14,9 +14,11 @@
  * limitations under the License.
  */
 
+import java.awt.Color;
 import java.awt.Graphics2D;
 import java.awt.Image;
 import java.awt.geom.AffineTransform;
+import java.awt.image.BufferedImage;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
@@ -25,8 +27,8 @@ import javax.imageio.ImageIO;
 
 
 public final class Ship extends Entity {
-	private static final int THRUST = 1, ROTATE_SPEED = 1, MAX_BULLETS = 4; 
-	private Image image;
+	private static final int THRUST = 1, ROTATE_SPEED = 1, MAX_BULLETS = 4, SPAWN_TIME_IN_MS = 300; 
+	private BufferedImage image, imageSpawning;
 	private Image[] thrustImages;
 	private int thrustRadius;
 	private AffineTransform trans = new AffineTransform();
@@ -51,10 +53,18 @@ public final class Ship extends Entity {
 	void drawShip(Graphics2D g2d) {
 		if (isDestroyed()) return;
 		aliveTime = Simulation.getSimulationTime() - birthTime;
-		if (isAccelerating) {
+		boolean isSpawning = aliveTime < SPAWN_TIME_IN_MS;
+		if (isAccelerating && !isSpawning) {
 			g2d.drawImage(getThrustImage(), getThrustTransform(), null);
 		}
-		g2d.drawImage(image, getTransform(), null);
+		if (isSpawning) {
+			if (imageSpawning == null) {
+				imageSpawning = RenderUtils.convertImageToSingleColorWithAlpha(image, Color.WHITE);
+			}
+		} else {
+			imageSpawning = null;
+		}
+		g2d.drawImage(imageSpawning != null ? imageSpawning : image, getTransform(), null);
 	}
 	
 	private int thrustFrame;
@@ -66,13 +76,17 @@ public final class Ship extends Entity {
 	}
 	
 	private AffineTransform getTransform() {
-		double scale = 1;
-		if (aliveTime < 300) {
-			scale = aliveTime / 300d;
+		boolean isSpawning = aliveTime < SPAWN_TIME_IN_MS;
+		double scale = 1, scaledRadius = radius;
+		if (isSpawning) {
+			scale = (double)aliveTime / SPAWN_TIME_IN_MS;
+			scaledRadius = radius * scale;
 		}
-		trans.setToTranslation(posX - (radius * scale), posY - (radius * scale));
-		trans.rotate(Math.toRadians(rotateDeg), radius, radius);
-		trans.scale(scale, scale);
+		trans.setToTranslation(posX - scaledRadius, posY - scaledRadius);
+		trans.rotate(Math.toRadians(rotateDeg), scaledRadius, scaledRadius);
+		if (isSpawning) {
+			trans.scale(scale, scale);
+		}
 		return trans;
 	}
 	
