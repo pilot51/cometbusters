@@ -49,7 +49,7 @@ public class GameView extends JComponent implements KeyListener {
 		setPreferredSize(new Dimension(VIEW_WIDTH, VIEW_HEIGHT));
 		imgBg = ImageIO.read(getClass().getClassLoader().getResource("img/background.png"));
 		ship = new Ship();
-		Sound.init();
+		Audio.init();
 		Bullet.init();
 		Asteroid.generateAsteroids(1);
 		addKeyListener(this);
@@ -141,13 +141,22 @@ public class GameView extends JComponent implements KeyListener {
 		buttonSound.addActionListener(new ActionListener() {
 			@Override
 			public void actionPerformed(ActionEvent e) {
-				buttonSound.setText(Sound.toggleSound() ? "Sound" : "(sound)");
+				buttonSound.setText(Audio.toggleSound() ? "Sound" : "(sound)");
 			}
 		});
 		menuBar.add(buttonSound);
 		JButton buttonMusic = new JButton("Music");
 		buttonMusic.setMnemonic(KeyEvent.VK_M);
 		buttonMusic.setFocusable(false);
+		buttonMusic.addActionListener(new ActionListener() {
+			@Override
+			public void actionPerformed(ActionEvent e) {
+				buttonMusic.setText(Audio.toggleMusic() ? "Music" : "(music)");
+				if (Simulation.isStarted) {
+					Audio.MUSIC_GAME.loop();
+				}
+			}
+		});
 		menuBar.add(buttonMusic);
 		JButton buttonHelp = new JButton("Help");
 		buttonHelp.setMnemonic(KeyEvent.VK_H);
@@ -161,12 +170,14 @@ public class GameView extends JComponent implements KeyListener {
 	}
 
 	private void startGame() {
+		ship.resetScore();
+		Audio.MUSIC_GAME.loop();
 		try {
 			Asteroid.generateAsteroids(1);
-			ship.spawn(VIEW_WIDTH / 2, VIEW_HEIGHT / 2);
 		} catch (IOException e) {
 			e.printStackTrace();
 		}
+		ship.spawn(VIEW_WIDTH / 2, VIEW_HEIGHT / 2);
 	}
 
 	private void stopGame() {
@@ -176,6 +187,7 @@ public class GameView extends JComponent implements KeyListener {
 		} catch (IOException e) {
 			e.printStackTrace();
 		}
+		Audio.MUSIC_GAME.stop();
 	}
 
 	@Override

@@ -104,8 +104,8 @@ public final class Ship extends Entity {
 	void thrust(boolean activate) {
 		if (isAccelerating == activate) return;
 		isAccelerating = activate;
-		if (activate) Sound.THRUST.loop();
-		else Sound.THRUST.stop();
+		if (activate) Audio.THRUST.loop();
+		else Audio.THRUST.stop();
 	}
 	
 	/**
@@ -115,7 +115,7 @@ public final class Ship extends Entity {
 	 */
 	void fire() {
 		if (BULLETS.size() < MAX_BULLETS) {
-			Sound.SHOOT.play();
+			Audio.SHOOT.play();
 			float bulletX = (float)(posX + Math.sin(Math.toRadians(rotateDeg)) * (radius - Bullet.getBulletRadius())),
 			      bulletY = (float)(posY - Math.cos(Math.toRadians(rotateDeg)) * (radius - Bullet.getBulletRadius()));
 			BULLETS.add(new Bullet(bulletX, bulletY, rotateDeg));
@@ -141,7 +141,7 @@ public final class Ship extends Entity {
 		velY = 0;
 		super.undestroy();
 		birthTime = Simulation.getSimulationTime();
-		Sound.SPAWN.play();
+		Audio.SPAWN.play();
 	}
 
 	/**
@@ -159,14 +159,24 @@ public final class Ship extends Entity {
 	@Override
 	void destroy() {
 		terminate();
-		Sound.EXPLODE_PLAYER.play();
+		Audio.EXPLODE_PLAYER.play();
+		Audio.MUSIC_GAME.stop();
+		if (score > 3000) {
+			Audio.MUSIC_HIGHSCORE.play();
+		} else {
+			Audio.MUSIC_DEATH.play();
+		}
 	}
 
-	public int getScore() {
+	int getScore() {
 		return score;
 	}
 
-	public void addScore(int score) {
+	void addScore(int score) {
 		this.score += score;
+	}
+
+	void resetScore() {
+		score = 0;
 	}
 }

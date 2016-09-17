@@ -1,13 +1,3 @@
-import java.awt.Graphics2D;
-import java.awt.Image;
-import java.awt.geom.AffineTransform;
-import java.io.IOException;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Random;
-
-import javax.imageio.ImageIO;
-
 /*
  * Copyright 2013 Mark Injerd
  *
@@ -23,6 +13,16 @@ import javax.imageio.ImageIO;
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
+import java.awt.Graphics2D;
+import java.awt.Image;
+import java.awt.geom.AffineTransform;
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Random;
+
+import javax.imageio.ImageIO;
 
 public final class Asteroid extends Entity {
 	public enum Size { LARGE, MEDIUM, SMALL }
@@ -84,15 +84,15 @@ public final class Asteroid extends Entity {
 		Size newSize = null;
 		switch (size) {
 		case LARGE:
-			Sound.EXPLODE_LARGE.play();
+			Audio.EXPLODE_LARGE.play();
 			newSize = Size.MEDIUM;
 			break;
 		case MEDIUM:
-			Sound.EXPLODE_MEDIUM.play();
+			Audio.EXPLODE_MEDIUM.play();
 			newSize = Size.SMALL;
 			break;
 		case SMALL:
-			Sound.EXPLODE_SMALL.play();
+			Audio.EXPLODE_SMALL.play();
 			break;
 		}
 		synchronized (ASTEROIDS) {

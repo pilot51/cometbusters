@@ -24,7 +24,10 @@ import javax.sound.sampled.LineUnavailableException;
 import javax.sound.sampled.SourceDataLine;
 import javax.sound.sampled.UnsupportedAudioFileException;
 
-public enum Sound {
+public enum Audio {
+	MUSIC_GAME("snd/comet.mid"),
+	MUSIC_DEATH("snd/comet1.mid"),
+	MUSIC_HIGHSCORE("snd/comet2.mid"),
 	THRUST("snd/thrust.wav"),
 	SHOOT("snd/shoot.wav"),
 	SPAWN("snd/spawn.wav"),
@@ -37,39 +40,60 @@ public enum Sound {
 		values();
 	}
 
-	private String filename;
-	private SoundPlayer player;
-	private static boolean isEnabled = true;
+	private static boolean isSoundEnabled = true, isMusicEnabled = true;
+	private AudioPlayer player;
+	private final String filename;
+	private final boolean isMusic;
 
-	private Sound(String filename) {
+	private Audio(String filename) {
 		this.filename = filename;
+		isMusic = filename.endsWith(".mid");
 	}
 
 	/**
 	 * @return True if sound has been enabled, false if disabled.
 	 */
-	public static boolean toggleSound() {
-		isEnabled ^= true;
-		if (!isEnabled) {
-			for (Sound s : values()) {
-				s.stop();
+	static boolean toggleSound() {
+		isSoundEnabled ^= true;
+		if (!isSoundEnabled) {
+			stopAll(false);
+		}
+		return isSoundEnabled;
+	}
+
+	/**
+	 * @return True if music has been enabled, false if disabled.
+	 */
+	static boolean toggleMusic() {
+		isMusicEnabled ^= true;
+		if (!isMusicEnabled) {
+			stopAll(true);
+		}
+		return isMusicEnabled;
+	}
+
+	/**
+	 * Plays this media if the respective sound or music setting is enabled. If the media is music, any other music playing is stopped first.
+	 * @param loop True to loop the sound until stopped, false to play it only once.
+	 */
+	void play(boolean loop) {
+		if (isMusic ? isMusicEnabled : isSoundEnabled) {
+			if (isMusic) {
+				stopAll(true);
 			}
+			player = new AudioPlayer(loop);
+			player.start();
 		}
-		return isEnabled;
 	}
 
+	/** Convenience for {@link #play(boolean)}, passing false for loop. */
 	void play() {
-		if (isEnabled) {
-			player = new SoundPlayer(filename, false);
-			player.start();
-		}
+		play(false);
 	}
 
+	/** Convenience for {@link #play(boolean)}, passing true for loop. */
 	void loop() {
-		if (isEnabled) {
-			player = new SoundPlayer(filename, true);
-			player.start();
-		}
+		play(true);
 	}
 
 	void stop() {
@@ -79,15 +103,26 @@ public enum Sound {
 		}
 	}
 
-	public static class SoundPlayer extends Thread {
-		private String filename;
+	/**
+	 * Stops all sound effects or music.
+	 * @param music True to stop music, false to stop sound effects.
+	 */
+	private static void stopAll(boolean music) {
+		for (Audio s : values()) {
+			if (s.isMusic == music) {
+				s.stop();
+			}
+		}
+	}
+
+	private class AudioPlayer extends Thread {
 		private boolean doLoop, stop;
 
-		public SoundPlayer(String file, boolean loop) {
-			filename = file;
+		private AudioPlayer(boolean loop) {
 			doLoop = loop;
 		}
 
+		@Override
 		public void run() {
 			AudioInputStream stream;
 			try {
@@ -118,8 +153,12 @@ public enum Sound {
 					if (nBytesRead >= 0 && !stop) {
 						line.write(buffer, 0, nBytesRead);
 					} else if (doLoop && !stop) {
-						stream.reset();
-						nBytesRead = 0;
+						if (stream.markSupported()) {
+							stream.reset();
+							nBytesRead = 0;
+						} else {
+							loop();
+						}
 					}
 				}
 			} catch (IOException e) {
