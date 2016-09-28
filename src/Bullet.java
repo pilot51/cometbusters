@@ -27,7 +27,8 @@ public final class Bullet extends Entity {
 	/** Size of asteroid that this bullet hit. Null if it has not hit an asteroid. */
 	private Asteroid.Size hitAsteroidSize;
 	private static final long DURATION = 2000;
-	private static final int SPEED = 15;
+	private static final int SPEED = 25;
+	private int playerId;
 	private long timeCreated;
 	private AffineTransform trans = new AffineTransform();
 	
@@ -37,9 +38,10 @@ public final class Bullet extends Entity {
 	 * @param y Initial y-position.
 	 * @param deg Bullet direction in degrees.
 	 */
-	Bullet(float x, float y, int deg) {
+	Bullet(int playerId, float x, float y, int deg) {
 		super(x, y, deg, SPEED);
 		super.radius = radius;
+		this.playerId = playerId;
 		timeCreated = Simulation.getSimulationTime();
 	}
 	
@@ -58,22 +60,8 @@ public final class Bullet extends Entity {
 			return;
 		}
 		super.calculateMotion();
-		checkForImpact();
 	}
 
-	/**
-	 * Checks if this bullet is contacting an asteroid and if so, collides them.
-	 */
-	private void checkForImpact() {
-		for (Asteroid a : Asteroid.getAsteroids()) {
-			if (isContacting(a)) {
-				collide(a);
-				hitAsteroidSize = a.getSize();
-				break;
-			}
-		}
-	}
-	
 	static void drawBullets(Graphics2D g2d, Ship ship) {
 		synchronized (ship.getBullets()) {
 			for (Bullet b : ship.getBullets()) {
@@ -92,8 +80,12 @@ public final class Bullet extends Entity {
 	}
 	
 	private AffineTransform getTransform() {
-		trans.setToTranslation(posX - radius, posY - radius);
+		trans.setToTranslation(pos.x - radius, pos.y - radius);
 		return trans;
+	}
+
+	int getPlayerId() {
+		return playerId;
 	}
 
 	/**

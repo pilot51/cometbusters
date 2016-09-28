@@ -1,3 +1,5 @@
+import java.util.ArrayList;
+
 /*
  * Copyright 2016 Mark Injerd
  *
@@ -18,48 +20,148 @@ public class Simulation {
 	/** Number of simulations per second. */
 	static final int TICK_RATE = 100;
 	/** Indicates if simulation and rendering is paused. */
-	static boolean isPaused;
+	private static boolean isPaused;
 	/** Indicates if gameplay has started. */
-	static boolean isStarted;
+	private static boolean isStarted;
 	private static long simulationTime = 0;
+	private static final ArrayList<GameStateListener> listeners = new ArrayList<GameStateListener>();
+
+	interface GameStateListener {
+		void onGameStartStateChanged(boolean started);
+		void onGamePauseStateChanged(boolean paused);
+	}
+
+	static void addGameStateListener(GameStateListener listener) {
+		Simulation.listeners.add(listener);
+	}
+
+	static boolean isStarted() {
+		return isStarted;
+	}
+
+	static boolean isPaused() {
+		return isPaused;
+	}
+
+	static void setStarted(boolean start) {
+		if (start == isStarted) return;
+		isStarted = start;
+		for (GameStateListener listener : listeners) {
+			listener.onGameStartStateChanged(start);
+		}
+	}
+
+	static void setPaused(boolean pause) {
+		if (pause == isPaused) return;
+		isPaused = pause;
+		for (GameStateListener listener : listeners) {
+			listener.onGamePauseStateChanged(pause);
+		}
+	}
 
 	/** Runs one simulation cycle. */
-	static void simulate(Ship ship) {
+	static void simulate() {
 		if (isPaused) return;
+		boolean isClient = MultiplayerManager.getInstance().isClient();
+		Ship localShip = ShipManager.getLocalShip();
 		simulationTime += 1000 / TICK_RATE;
-		if (!ship.isDestroyed()) {
-			ship.calculateMotion();
+		if (!localShip.isDestroyed()) {
+			localShip.calculateMotion();
 		}
-		for (int i = Asteroid.getAsteroids().size() - 1; i >= 0; i--) {
-			Asteroid a = Asteroid.getAsteroids().get(i);
-			a.calculateMotion();
-			if (ship.isContacting(a)) {
-				ship.collide(a);
+		synchronized (Asteroid.getAsteroids()) {
+			for (Asteroid a : Asteroid.getAsteroids()) {
+				a.calculateMotion();
 			}
 		}
-		for (int i = ship.getBullets().size() - 1; i >= 0; i--) {
-			Bullet b = ship.getBullets().get(i);
-			b.calculateMotion();
-			Asteroid.Size hitAsteroidSize = b.getHitAsteroidSize();
-			if (hitAsteroidSize != null) {
-				switch (hitAsteroidSize) {
-				case LARGE:
-					ship.addScore(20);
-					break;
-				case MEDIUM:
-					ship.addScore(50);
-					break;
-				case SMALL:
-					ship.addScore(100);
-					break;
-				}
-				b.setHitAsteroidSize(null);
-			}
-			if (b.isDestroyed()) {
-				synchronized (ship.getBullets()) {
-					ship.getBullets().remove(i);
+		if (isClient) {
+			synchronized (localShip.getBullets()) {
+				for (int i = localShip.getBullets().size() - 1; i >= 0; i--) {
+					if (localShip.getBullets().get(i).isDestroyed()) {
+						localShip.getBullets().remove(i);
+					}
 				}
 			}
+		} else {
+			for (Ship ship : ShipManager.getShips()) {
+				for (Bullet b : ship.getBullets()) {
+					b.calculateMotion();
+				}
+			}
+			checkCollisions();
+		}
+		MultiplayerManager.getInstance().sendShipUpdate();
+	}
+
+	private static void checkCollisions() {
+		if (MultiplayerManager.getInstance().isClient()) return;
+		Ship localShip = ShipManager.getLocalShip();
+		for (Ship ship : ShipManager.getShips()) {
+			// Ship vs. ship
+			if (ship != localShip && localShip.isContacting(ship)) {
+				localShip.collide(ship);
+			}
+			// Ship vs. asteroid
+			synchronized (Asteroid.getAsteroids()) {
+				for (int i = Asteroid.getAsteroids().size() - 1; i >= 0; i--) {
+					Asteroid a = Asteroid.getAsteroids().get(i);
+					if (ship.isContacting(a)) {
+						ship.collide(a);
+					}
+				}
+			}
+			synchronized (ship.getBullets()) {
+				for (int i = ship.getBullets().size() - 1; i >= 0; i--) {
+					Bullet bullet = ship.getBullets().get(i);
+					// Local bullet vs. remote ship
+					if (ship == localShip) {
+						for (Ship remoteShip : ShipManager.getShips()) {
+							if (remoteShip == localShip) continue;
+							if (bullet.isContacting(remoteShip)) {
+								bullet.collide(remoteShip);
+								break;
+							}
+						}
+					}
+					// Remote bullet vs. local ship
+					if (ship != localShip && bullet.isContacting(localShip)) {
+						bullet.collide(localShip);
+						break;
+					}
+					// Bullet vs. asteroid
+					synchronized (Asteroid.getAsteroids()) {
+						for (int n = Asteroid.getAsteroids().size() - 1; n >= 0; n--) {
+							Asteroid a = Asteroid.getAsteroids().get(n);
+							if (bullet.isContacting(a)) {
+								bullet.collide(a);
+								bullet.setHitAsteroidSize(a.getSize());
+								break;
+							}
+						}
+					}
+					updateScore(ship, bullet);
+					if (bullet.isDestroyed()) {
+						ship.getBullets().remove(i);
+					}
+				}
+			}
+		}
+	}
+
+	private static void updateScore(Ship ship, Bullet b) {
+		Asteroid.Size hitAsteroidSize = b.getHitAsteroidSize();
+		if (hitAsteroidSize != null) {
+			switch (hitAsteroidSize) {
+			case LARGE:
+				ship.addScore(20);
+				break;
+			case MEDIUM:
+				ship.addScore(50);
+				break;
+			case SMALL:
+				ship.addScore(100);
+				break;
+			}
+			b.setHitAsteroidSize(null);
 		}
 	}
 

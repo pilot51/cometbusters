@@ -15,9 +15,14 @@
  */
 
 public abstract class Entity {
-	protected float posX, posY, velX, velY;
+	protected final Position pos;
+	protected float velX, velY;
 	protected int radius;
 	protected boolean isAccelerating;
+	/** Initial direction of travel in degrees. */
+	protected final int direction;
+	/** Initial velocity. */
+	protected final int velocity;
 	/** Current rotation in degrees. */
 	protected int rotateDeg;
 	/** Current rotation direction and speed. Positive is clockwise, negative is counter-clockwise. */
@@ -32,11 +37,11 @@ public abstract class Entity {
 	 * Creates an object at the given coordinates with initial rotation and velocity.
 	 * @param x Initial x-position.
 	 * @param y Initial y-position.
-	 * @param rotationDeg Initial rotation in degrees.
+	 * @param direction Initial direction of travel in degrees.
 	 * @param velocity Initial forward velocity.
 	 */
-	Entity(float x, float y, int rotationDeg, int velocity) {
-		this(x, y, rotationDeg, velocity, 0, 0);
+	Entity(float x, float y, int direction, int velocity) {
+		this(x, y, direction, velocity, 0, 0);
 	}
 
 	/**
@@ -44,17 +49,18 @@ public abstract class Entity {
 	 * potential acceleration, and potential rotation speed.
 	 * @param x Initial x-position.
 	 * @param y Initial y-position.
-	 * @param rotationDeg Initial rotation in degrees.
+	 * @param direction Initial direction of travel in degrees.
 	 * @param velocity Initial forward velocity.
 	 * @param acceleration Forward acceleration applied when {@link #isAccelerating} is true.
 	 * @param rotationSpeed Rotation speed applied when {@link #rotateLeft()} or {@link #rotateRight()} is called, stopped with {@link #rotateStop()}.
 	 */
-	Entity(float x, float y, int rotationDeg, int velocity, int acceleration, int rotationSpeed) {
-		posX = x;
-		posY = y;
+	Entity(float x, float y, int direction, int velocity, int acceleration, int rotationSpeed) {
+		pos = new Position(x, y);
 		ACCELERATION = acceleration;
 		ROTATE_SPEED = rotationSpeed;
-		final double radians = Math.toRadians(rotationDeg);
+		this.direction = direction;
+		this.velocity = velocity;
+		final double radians = Math.toRadians(direction);
 		velX = (float)Math.sin(radians) * velocity;
 		velY = (float)Math.cos(radians) * velocity;
 	}
@@ -78,8 +84,8 @@ public abstract class Entity {
 		int accel = isAccelerating ? ACCELERATION : 0;
 		velX += Math.sin(radians) * accel * speedMultiplier;
 		velY += Math.cos(radians) * accel * speedMultiplier;
-		posX += velX * speedMultiplier;
-		posY -= velY * speedMultiplier;
+		pos.x += velX * speedMultiplier;
+		pos.y -= velY * speedMultiplier;
 		wrapScreen();
 	}
 
@@ -87,15 +93,15 @@ public abstract class Entity {
 	 * Wraps entity from one side of the screen to the opposite side.
 	 */
 	private void wrapScreen() {
-		if (posX < 0) {
-			posX += GameView.VIEW_WIDTH;
-		} else if (posX > GameView.VIEW_WIDTH) {
-			posX -= GameView.VIEW_WIDTH;
+		if (pos.x < 0) {
+			pos.x += GameView.VIEW_WIDTH;
+		} else if (pos.x > GameView.VIEW_WIDTH) {
+			pos.x -= GameView.VIEW_WIDTH;
 		}
-		if (posY < 0) {
-			posY += GameView.VIEW_HEIGHT;
-		} else if (posY > GameView.VIEW_HEIGHT) {
-			posY -= GameView.VIEW_HEIGHT;
+		if (pos.y < 0) {
+			pos.y += GameView.VIEW_HEIGHT;
+		} else if (pos.y > GameView.VIEW_HEIGHT) {
+			pos.y -= GameView.VIEW_HEIGHT;
 		}
 	}
 
@@ -141,8 +147,8 @@ public abstract class Entity {
 	 * @see #collide(Entity)
 	 */
 	final boolean isContacting(Entity otherEntity) {
-		return !isDestroyed && !otherEntity.isDestroyed && Math.abs(posX - otherEntity.posX)
-				+ Math.abs(posY - otherEntity.posY) < radius + otherEntity.radius;
+		return !isDestroyed && !otherEntity.isDestroyed && Math.abs(pos.x - otherEntity.pos.x)
+				+ Math.abs(pos.y - otherEntity.pos.y) < radius + otherEntity.radius;
 	}
 
 	/**
@@ -179,5 +185,13 @@ public abstract class Entity {
 	 */
 	final boolean isDestroyed() {
 		return isDestroyed;
+	}
+
+	public static class Position {
+		float x, y;
+		Position(float x, float y) {
+			this.x = x;
+			this.y = y;
+		}
 	}
 }

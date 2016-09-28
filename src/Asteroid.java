@@ -33,12 +33,12 @@ public final class Asteroid extends Entity {
 	private Size size;
 	private AffineTransform trans = new AffineTransform();
 	
-	private Asteroid(float x, float y, int rotationDeg, int velocity) {
-		this(x, y, rotationDeg, velocity, Size.LARGE);
+	private Asteroid(float x, float y, int direction, int velocity) {
+		this(x, y, direction, velocity, Size.LARGE);
 	}
 	
-	private Asteroid(float x, float y, int rotationDeg, int velocity, Size size) {
-		super(x, y, rotationDeg, velocity);
+	Asteroid(float x, float y, int direction, int velocity, Size size) {
+		super(x, y, direction, velocity);
 		this.size = size;
 		radius = image[size.ordinal()].getWidth(null) / 2;
 	}
@@ -47,25 +47,29 @@ public final class Asteroid extends Entity {
 	 * Loads asteroid images for provided level and randomly spawns several
 	 * large asteroids at screen edges with randomized speed and direction.
 	 * Clears any existing asteroids prior to generation.
-	 * @param level The level for which to generate asteroids.
+	 * @param level The level for which to generate asteroids. Use 0 (or any invalid level) to clear the asteroid field.
 	 * @throws IOException If asteroid images could not be read.
 	 */
 	static void generateAsteroids(int level) throws IOException {
-		ASTEROIDS.clear();
-		image[Size.LARGE.ordinal()] = ImageIO.read(Asteroid.class.getClassLoader().getResource("img/asteroid" + level + "_large.png"));
-		image[Size.MEDIUM.ordinal()] = ImageIO.read(Asteroid.class.getClassLoader().getResource("img/asteroid" + level + "_medium.png"));
-		image[Size.SMALL.ordinal()] = ImageIO.read(Asteroid.class.getClassLoader().getResource("img/asteroid" + level + "_small.png"));
-		while (ASTEROIDS.size() < MAX_ASTEROIDS) {
-			boolean spawnTopBottom = random.nextBoolean(); // Whether to spawn along the top/bottom instead of left/right edges.
-			ASTEROIDS.add(new Asteroid(spawnTopBottom ? random.nextInt(GameView.VIEW_WIDTH) : 0,
-			                           spawnTopBottom ? 0 : random.nextInt(GameView.VIEW_HEIGHT),
-			                           random.nextInt(360),
-			                           MIN_SPEED + random.nextInt(1 + MAX_SPEED - MIN_SPEED)));
+		synchronized (ASTEROIDS) {
+			ASTEROIDS.clear();
+			if (level <= 0 || level > 1) return;
+			image[Size.LARGE.ordinal()] = ImageIO.read(Asteroid.class.getClassLoader().getResource("img/asteroid" + level + "_large.png"));
+			image[Size.MEDIUM.ordinal()] = ImageIO.read(Asteroid.class.getClassLoader().getResource("img/asteroid" + level + "_medium.png"));
+			image[Size.SMALL.ordinal()] = ImageIO.read(Asteroid.class.getClassLoader().getResource("img/asteroid" + level + "_small.png"));
+			while (ASTEROIDS.size() < MAX_ASTEROIDS) {
+				boolean spawnTopBottom = random.nextBoolean(); // Whether to spawn along the top/bottom instead of left/right edges.
+				ASTEROIDS.add(new Asteroid(spawnTopBottom ? random.nextInt(GameView.VIEW_WIDTH) : 0,
+				                           spawnTopBottom ? 0 : random.nextInt(GameView.VIEW_HEIGHT),
+				                           random.nextInt(360),
+				                           MIN_SPEED + random.nextInt(1 + MAX_SPEED - MIN_SPEED)));
+			}
 		}
+		MultiplayerManager.getInstance().sendAsteroids();
 	}
 	
 	private AffineTransform getTransform() {
-		trans.setToTranslation(posX - radius, posY - radius);
+		trans.setToTranslation(pos.x - radius, pos.y - radius);
 		return trans;
 	}
 	
@@ -102,12 +106,13 @@ public final class Asteroid extends Entity {
 				for (int x = 1; x <= 2; x++) {
 					newDir = random.nextInt(360);
 					newVel = MIN_SPEED + random.nextInt(1 + MAX_SPEED - MIN_SPEED);
-					ASTEROIDS.add(new Asteroid(posX, posY, newDir, newVel, newSize));
+					ASTEROIDS.add(new Asteroid(pos.x, pos.y, newDir, newVel, newSize));
 				}
 			}
 			ASTEROIDS.remove(this);
 		}
 		super.destroy();
+		MultiplayerManager.getInstance().sendAsteroids();
 	}
 
 	static List<Asteroid> getAsteroids() {

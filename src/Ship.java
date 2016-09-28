@@ -27,7 +27,7 @@ import javax.imageio.ImageIO;
 
 
 public final class Ship extends Entity {
-	private static final int THRUST = 1, ROTATE_SPEED = 1, MAX_BULLETS = 4, SPAWN_TIME_IN_MS = 300; 
+	private static final int THRUST = 1, ROTATE_SPEED = 1, MAX_BULLETS = 4, SPAWN_TIME_IN_MS = 300;
 	private BufferedImage image, imageSpawning;
 	private Image[] thrustImages;
 	private int thrustRadius;
@@ -50,6 +50,16 @@ public final class Ship extends Entity {
 		thrustRadius = thrustImages[0].getWidth(null) / 2;
 	}
 	
+	/**
+	 * Forces update of ship position, rotation, and thrust.
+	 */
+	void forceUpdate(float x, float y, int rotationDeg, boolean thrust) {
+		pos.x = x;
+		pos.y = y;
+		rotateDeg = rotationDeg;
+		thrust(thrust);
+	}
+
 	void drawShip(Graphics2D g2d) {
 		if (isDestroyed()) return;
 		aliveTime = Simulation.getSimulationTime() - birthTime;
@@ -82,7 +92,7 @@ public final class Ship extends Entity {
 			scale = (double)aliveTime / SPAWN_TIME_IN_MS;
 			scaledRadius = radius * scale;
 		}
-		trans.setToTranslation(posX - scaledRadius, posY - scaledRadius);
+		trans.setToTranslation(pos.x - scaledRadius, pos.y - scaledRadius);
 		trans.rotate(Math.toRadians(rotateDeg), scaledRadius, scaledRadius);
 		if (isSpawning) {
 			trans.scale(scale, scale);
@@ -91,7 +101,7 @@ public final class Ship extends Entity {
 	}
 	
 	private AffineTransform getThrustTransform() {
-		trans.setToTranslation(posX - (thrustRadius - 1), posY + radius / 2);
+		trans.setToTranslation(pos.x - (thrustRadius - 1), pos.y + radius / 2);
 		trans.rotate(Math.toRadians(rotateDeg), thrustRadius - 1, -radius / 2);
 		return trans;
 	}
@@ -116,9 +126,11 @@ public final class Ship extends Entity {
 	void fire() {
 		if (BULLETS.size() < MAX_BULLETS) {
 			Audio.SHOOT.play();
-			float bulletX = (float)(posX + Math.sin(Math.toRadians(rotateDeg)) * (radius - Bullet.getBulletRadius())),
-			      bulletY = (float)(posY - Math.cos(Math.toRadians(rotateDeg)) * (radius - Bullet.getBulletRadius()));
-			BULLETS.add(new Bullet(bulletX, bulletY, rotateDeg));
+			float bulletX = (float)(pos.x + Math.sin(Math.toRadians(rotateDeg)) * (radius - Bullet.getBulletRadius())),
+			      bulletY = (float)(pos.y - Math.cos(Math.toRadians(rotateDeg)) * (radius - Bullet.getBulletRadius()));
+			Bullet bullet = new Bullet(ShipManager.getPlayerId(this), bulletX, bulletY, rotateDeg);
+			BULLETS.add(bullet);
+			MultiplayerManager.getInstance().sendFiredBullet(bullet);
 		}
 	}
 	
@@ -131,14 +143,9 @@ public final class Ship extends Entity {
 	}
 
 	/**
-	 * Spawns this ship at the specified coordinates, motionless and pointed up.
+	 * Spawns this ship at the coordinates defined for the player id, motionless and pointed up.
 	 */
-	void spawn(int x, int y) {
-		posX = x;
-		posY = y;
-		rotateDeg = 0;
-		velX = 0;
-		velY = 0;
+	void spawn() {
 		super.undestroy();
 		birthTime = Simulation.getSimulationTime();
 		Audio.SPAWN.play();
@@ -176,7 +183,14 @@ public final class Ship extends Entity {
 		this.score += score;
 	}
 
-	void resetScore() {
+	/** Resets position, rotation, velocity, and score. */
+	void reset() {
+		Entity.Position startPos = ShipManager.getSpawnPosition(ShipManager.getPlayerId(this));
+		pos.x = startPos.x;
+		pos.y = startPos.y;
+		rotateDeg = 0;
+		velX = 0;
+		velY = 0;
 		score = 0;
 	}
 }
