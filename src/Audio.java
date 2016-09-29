@@ -139,7 +139,7 @@ public enum Audio {
 			try {
 				line = (SourceDataLine)AudioSystem.getLine(new DataLine.Info(SourceDataLine.class, format));
 				line.open(format);
-			} catch (LineUnavailableException e) {
+			} catch (LineUnavailableException | IllegalStateException e) {
 				e.printStackTrace();
 				return;
 			}

@@ -112,6 +112,8 @@ public class MultiplayerManager {
 									Float.parseFloat(data[POSY]), Integer.parseInt(data[ROTATION])));
 							break;
 						}
+					} else {
+						disconnect();
 					}
 				};
 			}
@@ -122,22 +124,28 @@ public class MultiplayerManager {
 		new Thread(new Runnable() {
 			@Override
 			public void run() {
+				System.out.println("Starting host on port " + PORT);
 				try {
 					serverSocket = new ServerSocket(PORT);
 				} catch (IOException e) {
 					System.out.println("Could not listen on port " + PORT);
+					return;
 				}
 				connectionListener.onHostWaiting();
 				try{
 					clientSocket = serverSocket.accept();
 					ipRemote = clientSocket.getInetAddress();
-					System.out.println("Incoming connection: " + ipRemote.getHostAddress() + ":" + PORT);
+					System.out.println("Incoming connection: " + ipRemote.getHostAddress() + ":" + clientSocket.getPort());
 					in = new BufferedReader(new InputStreamReader(clientSocket.getInputStream()));
 					out = new PrintWriter(clientSocket.getOutputStream(), true);
 					onConnected(0);
 					startListening();
 				} catch (IOException e) {
-					System.out.println("Connection failed on port " + PORT);
+					if (serverSocket != null) {
+						System.out.println("Connection failed!");
+						e.printStackTrace();
+						disconnect();
+					}
 				}
 			}
 		}).start();
@@ -155,20 +163,20 @@ public class MultiplayerManager {
 					System.out.println("Connecting to server: " + ipRemote.getHostAddress() + ":" + PORT);
 					try {
 						clientSocket = new Socket(ipRemote, PORT);
+						System.out.println("Local client port: " + clientSocket.getLocalPort());
 						out = new PrintWriter(clientSocket.getOutputStream(), true);
 						in = new BufferedReader(new InputStreamReader(clientSocket.getInputStream()));
 						onConnected(1);
 						startListening();
-					} catch (UnknownHostException e) {
-						System.out.println("Unknown host: " + ipRemote.getHostAddress());
-						e.printStackTrace();
 					} catch (IOException e) {
+						System.out.println("Connection failed!");
 						e.printStackTrace();
+						disconnect();
 					}
 				}
 			}).start();
 		} catch (UnknownHostException e) {
-			e.printStackTrace();
+			System.out.println("Unknown host: " + address);
 		}
 	}
 
@@ -182,7 +190,7 @@ public class MultiplayerManager {
 					} catch (IOException e) {
 						e.printStackTrace();
 					}
-					System.out.println("Disconnected: " + ipRemote.getHostAddress() + ":" + PORT);
+					System.out.println("Disconnected from " + ipRemote.getHostAddress() + ":" + PORT);
 					in = null;
 					out = null;
 					clientSocket = null;
@@ -275,15 +283,11 @@ public class MultiplayerManager {
 		if (in == null) {
 			return null;
 		}
-		String msg;
+		String msg = null;
 		try {
 			msg = in.readLine();
 		} catch (IOException e) {
 			e.printStackTrace();
-			disconnect();
-			return null;
-		}
-		if (msg != null) {
 		}
 		return msg;
 	}
@@ -300,7 +304,7 @@ public class MultiplayerManager {
 	 * @param playerId ID of the local player.
 	 */
 	private void onConnected(int playerId) {
-		System.out.println("onConnected: " + playerId);
+		System.out.println("Connected! Local player ID: " + playerId);
 		isConnected = true;
 		List<Ship> ships = ShipManager.getShips();
 		isClient = playerId != 0;
@@ -331,7 +335,6 @@ public class MultiplayerManager {
 	}
 
 	private void onDisconnected() {
-		System.out.println("onDisconnected");
 		Simulation.setStarted(false);
 		isConnected = false;
 		isClient = false;
