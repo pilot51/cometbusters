@@ -19,7 +19,7 @@ import java.util.ArrayList;
 
 public class ShipManager {
 	private static Ship localShip;
-	private static ArrayList<Ship> ships;
+	private static final ArrayList<Ship> SHIPS = new ArrayList<Ship>(4);;
 	private static final Entity.Position[] MP_SPAWN_POSITIONS = new Entity.Position[] {
 			new Entity.Position(GameView.VIEW_WIDTH / 4, GameView.VIEW_HEIGHT / 4),
 			new Entity.Position(GameView.VIEW_WIDTH * 3/4, GameView.VIEW_HEIGHT * 3/4),
@@ -38,27 +38,30 @@ public class ShipManager {
 	}
 
 	static ArrayList<Ship> getShips() {
-		if (ships == null) {
-			ships = new ArrayList<Ship>(4);
-			ships.add(getLocalShip());
+		if (SHIPS.isEmpty()) {
+			SHIPS.add(getLocalShip());
 		}
-		return ships;
+		return SHIPS;
 	}
 
-	void addShip(Ship ship, int id) {
-		if (id == ships.size()) {
-			ships.add(ship);
-		} else {
-			ships.set(id, ship);
+	static void addShip(Ship ship, int id) {
+		synchronized (SHIPS) {
+			if (id == SHIPS.size()) {
+				SHIPS.add(ship);
+			} else {
+				SHIPS.set(id, ship);
+			}
 		}
+		ship.setPlayerColor(id);
 	}
 
 	static void clearShips() {
-		ships = null;
+		SHIPS.clear();
+		localShip.setPlayerColor(0);
 	}
 
 	static int getPlayerId(Ship ship) {
-		return ships.indexOf(ship);
+		return SHIPS.indexOf(ship);
 	}
 
 	static Entity.Position getSpawnPosition(int playerId) {

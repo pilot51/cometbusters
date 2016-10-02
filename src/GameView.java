@@ -14,7 +14,6 @@
  * limitations under the License.
  */
 
-import java.awt.Color;
 import java.awt.Dimension;
 import java.awt.Font;
 import java.awt.Graphics;
@@ -72,22 +71,23 @@ public class GameView extends JComponent implements KeyListener {
 		super.paintComponent(g);
 		Graphics2D g2d = (Graphics2D)g;
 		g2d.drawImage(imgBg, 0, 0, null);
-		g2d.setColor(Color.decode("#00FFFF"));
-		g2d.setFont(new Font("Arial", Font.PLAIN, 18));
+		g2d.setFont(new Font("Arial", Font.PLAIN, 22));
 		List<Ship> ships = ShipManager.getShips();
 		for (int i = 0; i < ships.size(); i++) {
 			int x = 0, y = 0;
 			if (i == 0 || i == 3) {
 				x = 30;
 			} else {
-				x = VIEW_WIDTH - 110;
+				x = VIEW_WIDTH - 118;
 			}
 			if (i == 0 || i == 2) {
 				y = 30;
 			} else {
-				y = VIEW_HEIGHT - 30;
+				y = VIEW_HEIGHT - 42;
 			}
+			g2d.setColor(RenderUtils.PLAYER_COLORS[i]);
 			g2d.drawString(String.format("%07d", ships.get(i).getScore()), x, y);
+			RenderUtils.drawLives(g2d, ships.get(i).getLives(), RenderUtils.PLAYER_COLORS[i], x, y + 14);
 		}
 		Asteroid.drawAsteroids(g2d);
 		for (Ship s : ships) {
@@ -272,7 +272,7 @@ public class GameView extends JComponent implements KeyListener {
 
 	private void startGame() {
 		if (MultiplayerManager.getInstance().isClient()) {
-			ShipManager.getLocalShip().reset();
+			ShipManager.getLocalShip().reset(true);
 		} else {
 			try {
 				Asteroid.generateAsteroids(1);
@@ -280,7 +280,7 @@ public class GameView extends JComponent implements KeyListener {
 				e.printStackTrace();
 			}
 			for (Ship ship : ShipManager.getShips()) {
-				ship.reset();
+				ship.reset(true);
 				ship.spawn();
 			}
 		}

@@ -29,7 +29,7 @@ public class MultiplayerManager {
 	private static MultiplayerManager instance;
 	private static final int MESSAGE_TYPE_GAME = 0, MESSAGE_TYPE_PLAYER = 1, MESSAGE_TYPE_ASTEROIDS = 2, MESSAGE_TYPE_BULLET = 3;
 	private static final int MESSAGE_TYPE = 0, IS_STARTED = 1, IS_PAUSED = 2,
-			PLAYER_ID = 1, POSX = 2, POSY = 3, ROTATION = 4, ACCEL = 5, DESTROYED = 6, SCORE = 7;
+			PLAYER_ID = 1, POSX = 2, POSY = 3, ROTATION = 4, ACCEL = 5, DESTROYED = 6, SCORE = 7, LIVES = 8;
 	private Socket clientSocket;
 	private ServerSocket serverSocket;
 	private PrintWriter out;
@@ -98,14 +98,14 @@ public class MultiplayerManager {
 							List<Bullet> bullets = null;
 							if (data.length > 7) {
 								bullets = new ArrayList<Bullet>();
-								for (int i = 8; i + 2 < data.length; i += 3) {
+								for (int i = 9; i + 2 < data.length; i += 3) {
 									bullets.add(new Bullet(Integer.parseInt(data[PLAYER_ID]), Float.parseFloat(data[i]),
 											Float.parseFloat(data[i+1]), Integer.parseInt(data[i+2])));
 								}
 							}
 							onReceivePlayerData(Integer.parseInt(data[PLAYER_ID]), Float.parseFloat(data[POSX]),
 									Float.parseFloat(data[POSY]), Integer.parseInt(data[ROTATION]), Boolean.parseBoolean(data[ACCEL]),
-									Boolean.parseBoolean(data[DESTROYED]), Integer.parseInt(data[SCORE]), bullets);
+									Boolean.parseBoolean(data[DESTROYED]), Integer.parseInt(data[SCORE]), Integer.parseInt(data[LIVES]), bullets);
 							break;
 						case MESSAGE_TYPE_BULLET:
 							onReceiveFiredBulletData(new Bullet(Integer.parseInt(data[PLAYER_ID]), Float.parseFloat(data[POSX]),
@@ -241,7 +241,7 @@ public class MultiplayerManager {
 			return;
 		}
 		String data = MESSAGE_TYPE_PLAYER + " " + ShipManager.getShips().indexOf(ship) + " " + ship.pos.x + " " + ship.pos.y
-				+ " " + ship.rotateDeg + " " + ship.isAccelerating + " " + ship.isDestroyed() + " " + ship.getScore();
+				+ " " + ship.rotateDeg + " " + ship.isAccelerating + " " + ship.isDestroyed() + " " + ship.getScore() + " " + ship.getLives();
 		synchronized (ship.getBullets()) {
 			for (Bullet b : ship.getBullets()) {
 				data += " " + b.pos.x + " " + b.pos.y + " " + b.direction;
@@ -306,30 +306,23 @@ public class MultiplayerManager {
 	private void onConnected(int playerId) {
 		System.out.println("Connected! Local player ID: " + playerId);
 		isConnected = true;
-		List<Ship> ships = ShipManager.getShips();
 		isClient = playerId != 0;
 		connectionListener.onConnected();
-		synchronized (ships) {
-			if (isClient) {
-				try {
-					Ship hostShip = new Ship();
-					ships.set(0, hostShip);
-				} catch (IOException e) {
-					e.printStackTrace();
-				}
-				Ship ship = ShipManager.getLocalShip();
-				ships.add(ship);
-			} else {
-				sendGameData();
-				sendAsteroids();
-				Ship ship = ShipManager.getLocalShip();
-				ships.set(0, ship);
-				try {
-					Ship clientShip = new Ship();
-					ships.add(1, clientShip);
-				} catch (IOException e) {
-					e.printStackTrace();
-				}
+		if (isClient) {
+			try {
+				ShipManager.addShip(new Ship(), 0);
+			} catch (IOException e) {
+				e.printStackTrace();
+			}
+			ShipManager.addShip(ShipManager.getLocalShip(), 1);
+		} else {
+			sendGameData();
+			sendAsteroids();
+			ShipManager.addShip(ShipManager.getLocalShip(), 0);
+			try {
+				ShipManager.addShip(new Ship(), 1);
+			} catch (IOException e) {
+				e.printStackTrace();
 			}
 		}
 	}
@@ -347,14 +340,16 @@ public class MultiplayerManager {
 		Simulation.setPaused(isPaused);
 	}
 
-	private void onReceivePlayerData(int playerId, float posX, float posY, int rotationDeg, boolean thrust, boolean isDestroyed, int score, List<Bullet> bullets) {
+	private void onReceivePlayerData(int playerId, float posX, float posY, int rotationDeg, boolean thrust,
+			boolean isDestroyed, int score, int lives, List<Bullet> bullets) {
 		List<Ship> ships = ShipManager.getShips();
 		if (!isClient && playerId != 0) {
 			Ship otherShip = ships.get(playerId);
 			otherShip.forceUpdate(posX, posY, rotationDeg, thrust);
 		} else if (isClient) {
 			Ship ship = ships.get(playerId);
-			ship.addScore(score - ship.getScore());
+			ship.setScore(score);
+			ship.setLives(lives);
 			if (ship != ShipManager.getLocalShip()) {
 				ship.forceUpdate(posX, posY, rotationDeg, thrust);
 			}
@@ -374,7 +369,10 @@ public class MultiplayerManager {
 
 	private void onReceiveFiredBulletData(Bullet bullet) {
 		if (!isClient) {
-			ShipManager.getShips().get(bullet.getPlayerId()).getBullets().add(bullet);
+			List<Bullet> bullets = ShipManager.getShips().get(bullet.getPlayerId()).getBullets();
+			synchronized (bullets) {
+				bullets.add(bullet);
+			}
 		}
 		Audio.SHOOT.play();
 	}

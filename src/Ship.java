@@ -22,18 +22,20 @@ import java.awt.image.BufferedImage;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Timer;
+import java.util.TimerTask;
 
 import javax.imageio.ImageIO;
 
 
 public final class Ship extends Entity {
-	private static final int THRUST = 1, ROTATE_SPEED = 1, MAX_BULLETS = 4, SPAWN_TIME_IN_MS = 300;
+	private static final int THRUST = 1, ROTATE_SPEED = 1, MAX_BULLETS = 4, RESPAWN_DELAY = 2000, MATERIALIZE_TIME = 300;
 	private BufferedImage image, imageSpawning;
 	private Image[] thrustImages;
 	private int thrustRadius;
-	private AffineTransform trans = new AffineTransform();
+	private final AffineTransform trans = new AffineTransform();
 	private final List<Bullet> BULLETS = new ArrayList<Bullet>(MAX_BULLETS);
-	private int score = 0;
+	private int score = 0, lives = 5;
 	private long birthTime, aliveTime;
 	
 	/**
@@ -43,7 +45,7 @@ public final class Ship extends Entity {
 	Ship() throws IOException {
 		super(0, 0, 0, 0, THRUST, ROTATE_SPEED);
 		super.destroy();
-		image = ImageIO.read(getClass().getClassLoader().getResource("img/ship.png"));
+		setPlayerColor(0);
 		radius = image.getWidth(null) / 2;
 		thrustImages = new Image[] {ImageIO.read(getClass().getClassLoader().getResource("img/thrust1.png")),
 		                            ImageIO.read(getClass().getClassLoader().getResource("img/thrust2.png"))};
@@ -60,14 +62,21 @@ public final class Ship extends Entity {
 		thrust(thrust);
 	}
 
+	/**
+	 * Updates the ship image with the correct player color.
+	 * @param playerId The player ID used to determine color.
+	 */
+	void setPlayerColor(int playerId) {
+		image = RenderUtils.getPlayerShipImage(playerId);
+	}
+
 	void drawShip(Graphics2D g2d) {
 		if (isDestroyed()) return;
 		aliveTime = Simulation.getSimulationTime() - birthTime;
-		boolean isSpawning = aliveTime < SPAWN_TIME_IN_MS;
-		if (isAccelerating && !isSpawning) {
+		if (isAccelerating && !isSpawning()) {
 			g2d.drawImage(getThrustImage(), getThrustTransform(), null);
 		}
-		if (isSpawning) {
+		if (isSpawning()) {
 			if (imageSpawning == null) {
 				imageSpawning = RenderUtils.convertImageToSingleColorWithAlpha(image, Color.WHITE);
 			}
@@ -76,7 +85,7 @@ public final class Ship extends Entity {
 		}
 		g2d.drawImage(imageSpawning != null ? imageSpawning : image, getTransform(), null);
 	}
-	
+
 	private int thrustFrame;
 	private Image getThrustImage() {
 		if (++thrustFrame == thrustImages.length) {
@@ -86,15 +95,14 @@ public final class Ship extends Entity {
 	}
 	
 	private AffineTransform getTransform() {
-		boolean isSpawning = aliveTime < SPAWN_TIME_IN_MS;
 		double scale = 1, scaledRadius = radius;
-		if (isSpawning) {
-			scale = (double)aliveTime / SPAWN_TIME_IN_MS;
+		if (isSpawning()) {
+			scale = spawnProgress();
 			scaledRadius = radius * scale;
 		}
 		trans.setToTranslation(pos.x - scaledRadius, pos.y - scaledRadius);
 		trans.rotate(Math.toRadians(rotateDeg), scaledRadius, scaledRadius);
-		if (isSpawning) {
+		if (isSpawning()) {
 			trans.scale(scale, scale);
 		}
 		return trans;
@@ -129,7 +137,9 @@ public final class Ship extends Entity {
 			float bulletX = (float)(pos.x + Math.sin(Math.toRadians(rotateDeg)) * (radius - Bullet.getBulletRadius())),
 			      bulletY = (float)(pos.y - Math.cos(Math.toRadians(rotateDeg)) * (radius - Bullet.getBulletRadius()));
 			Bullet bullet = new Bullet(ShipManager.getPlayerId(this), bulletX, bulletY, rotateDeg);
-			BULLETS.add(bullet);
+			synchronized (BULLETS) {
+				BULLETS.add(bullet);
+			}
 			MultiplayerManager.getInstance().sendFiredBullet(bullet);
 		}
 	}
@@ -143,12 +153,35 @@ public final class Ship extends Entity {
 	}
 
 	/**
+	 * @return True if it is relatively safe to respawn, false if an asteroid is too close to the spawn point.
+	 */
+	private boolean isSafeHaven() {
+		synchronized (Asteroid.getAsteroids()) {
+			for (Asteroid a : Asteroid.getAsteroids()) {
+				if (Math.abs(pos.x - a.pos.x) + Math.abs(pos.y - a.pos.y) < radius + a.radius + 100) {
+					return false;
+				}
+			}
+			return true;
+		}
+	}
+
+	/**
 	 * Spawns this ship at the coordinates defined for the player id, motionless and pointed up.
 	 */
 	void spawn() {
 		super.undestroy();
 		birthTime = Simulation.getSimulationTime();
+		lives--;
 		Audio.SPAWN.play();
+	}
+
+	boolean isSpawning() {
+		return aliveTime < MATERIALIZE_TIME;
+	}
+
+	double spawnProgress() {
+		return (double)aliveTime / MATERIALIZE_TIME;
 	}
 
 	/**
@@ -167,30 +200,64 @@ public final class Ship extends Entity {
 	void destroy() {
 		terminate();
 		Audio.EXPLODE_PLAYER.play();
-		Audio.MUSIC_GAME.stop();
-		if (score > 3000) {
-			Audio.MUSIC_HIGHSCORE.play();
+		if (lives > 0) {
+			reset(false);
+			long deathTime = Simulation.getSimulationTime();
+			new Timer().schedule(new TimerTask() {
+				@Override
+				public void run() {
+					if (!isDestroyed() || !Simulation.isStarted()) {
+						cancel();
+					} else if (Simulation.getSimulationTime() - deathTime >= RESPAWN_DELAY && isSafeHaven()) {
+						spawn();
+						cancel();
+					}
+				}
+			}, Simulation.TICK_RATE, 1000 / Simulation.TICK_RATE);
 		} else {
-			Audio.MUSIC_DEATH.play();
+			Audio.MUSIC_GAME.stop();
+			if (lives == -1 && score > 3000) {
+				Audio.MUSIC_HIGHSCORE.play();
+			} else {
+				Audio.MUSIC_DEATH.play();
+			}
 		}
+	}
+
+	int getLives() {
+		return lives;
+	}
+
+	void setLives(int lives) {
+		this.lives = lives;
 	}
 
 	int getScore() {
 		return score;
 	}
 
+	void setScore(int score) {
+		this.score = score;
+	}
+
 	void addScore(int score) {
 		this.score += score;
 	}
 
-	/** Resets position, rotation, velocity, and score. */
-	void reset() {
+	/**
+	 * Resets position, rotation, velocity, and optionally score and lives.
+	 * @param resetForNewGame True to reset lives and score for new game, false to leave them unchanged for respawning.
+	 */
+	void reset(boolean resetForNewGame) {
 		Entity.Position startPos = ShipManager.getSpawnPosition(ShipManager.getPlayerId(this));
 		pos.x = startPos.x;
 		pos.y = startPos.y;
 		rotateDeg = 0;
 		velX = 0;
 		velY = 0;
-		score = 0;
+		if (resetForNewGame) {
+			score = 0;
+			lives = 5;
+		}
 	}
 }
