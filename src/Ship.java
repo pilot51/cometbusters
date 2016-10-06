@@ -215,11 +215,15 @@ public final class Ship extends Entity {
 				}
 			}, Simulation.TICK_RATE, 1000 / Simulation.TICK_RATE);
 		} else {
-			Audio.MUSIC_GAME.stop();
-			if (lives == -1 && score > 3000) {
-				Audio.MUSIC_HIGHSCORE.play();
-			} else {
-				Audio.MUSIC_DEATH.play();
+			boolean gameOver = true;
+			for (Ship ship : ShipManager.getShips()) {
+				if (!ship.isDestroyed() || ship.getLives() > 0) {
+					gameOver = false;
+					break;
+				}
+			}
+			if (gameOver) {
+				LevelManager.gameOver();
 			}
 		}
 	}

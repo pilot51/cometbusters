@@ -23,6 +23,8 @@ import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
 import java.awt.event.KeyEvent;
 import java.awt.event.KeyListener;
+import java.awt.font.TextLayout;
+import java.awt.geom.Rectangle2D;
 import java.io.IOException;
 import java.util.List;
 import java.util.Timer;
@@ -52,7 +54,7 @@ public class GameView extends JComponent implements KeyListener {
 		imgBg = ImageIO.read(getClass().getClassLoader().getResource("img/background.png"));
 		Audio.init();
 		Bullet.init();
-		Asteroid.generateAsteroids(1);
+		LevelManager.createBackgroundAsteroids();
 		addKeyListener(this);
 		setFocusable(true);
 		new Timer().schedule(new TimerTask() {
@@ -93,6 +95,21 @@ public class GameView extends JComponent implements KeyListener {
 		for (Ship s : ships) {
 			s.drawShip(g2d);
 			Bullet.drawBullets(g2d, s);
+		}
+		if (LevelManager.isWaitingToStartLevel()) {
+			Font font = new Font(Font.SANS_SERIF, Font.BOLD, 100);
+			g2d.setFont(font);
+			g2d.setColor(RenderUtils.TEXT_LEVEL_COLOR);
+			String text = "LEVEL " + LevelManager.getLevel();
+			Rectangle2D textBounds = new TextLayout(text, font, g2d.getFontRenderContext()).getBounds();
+			g2d.drawString(text, VIEW_WIDTH / 2 - (int)textBounds.getWidth() / 2, VIEW_HEIGHT / 4 + (int)textBounds.getHeight() / 2);
+		} else if (LevelManager.shouldShowText() && LevelManager.isGameOver()) {
+			Font font = new Font(Font.SANS_SERIF, Font.BOLD, 100);
+			g2d.setFont(font);
+			g2d.setColor(RenderUtils.TEXT_GAMEOVER_COLOR);
+			String text = "GAME OVER";
+			Rectangle2D textBounds = new TextLayout(text, font, g2d.getFontRenderContext()).getBounds();
+			g2d.drawString(text, VIEW_WIDTH / 2 - (int)textBounds.getWidth() / 2, VIEW_HEIGHT / 2 + (int)textBounds.getHeight() / 2);
 		}
 		getToolkit().sync();
 	}
@@ -144,11 +161,10 @@ public class GameView extends JComponent implements KeyListener {
 		buttonStart.addActionListener(new ActionListener() {
 			@Override
 			public void actionPerformed(ActionEvent e) {
-				Simulation.setStarted(!Simulation.isStarted());
 				if (Simulation.isStarted()) {
-					startGame();
+					LevelManager.stopGame();
 				} else {
-					stopGame();
+					LevelManager.startGame();
 				}
 			}
 		});
@@ -222,11 +238,10 @@ public class GameView extends JComponent implements KeyListener {
 				buttonStart.setText(started ? "Stop" : "Start");
 				if (MultiplayerManager.getInstance().isClient()) {
 					buttonStart.setEnabled(false);
-					Simulation.setStarted(started);
 					if (started) {
-						startGame();
-					} else {
-						stopGame();
+						LevelManager.startGame();
+					} else if (!LevelManager.isGameOver()) {
+						LevelManager.stopGame();
 					}
 				}
 			}
@@ -268,35 +283,6 @@ public class GameView extends JComponent implements KeyListener {
 			}
 		});
 		return menuBar;
-	}
-
-	private void startGame() {
-		if (MultiplayerManager.getInstance().isClient()) {
-			ShipManager.getLocalShip().reset(true);
-		} else {
-			try {
-				Asteroid.generateAsteroids(1);
-			} catch (IOException e) {
-				e.printStackTrace();
-			}
-			for (Ship ship : ShipManager.getShips()) {
-				ship.reset(true);
-				ship.spawn();
-			}
-		}
-		Audio.MUSIC_GAME.loop();
-	}
-
-	private void stopGame() {
-		for (Ship ship : ShipManager.getShips()) {
-			ship.terminate();
-		}
-		try {
-			Asteroid.generateAsteroids(1);
-		} catch (IOException e) {
-			e.printStackTrace();
-		}
-		Audio.MUSIC_GAME.stop();
 	}
 
 	@Override

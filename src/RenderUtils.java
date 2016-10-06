@@ -25,6 +25,7 @@ import javax.imageio.ImageIO;
 public class RenderUtils {
 	static final Color[] PLAYER_COLORS = new Color[] { Color.CYAN, Color.MAGENTA, Color.GREEN, Color.YELLOW };
 	private static final int[] PLAYER_HUES = new int[] { 180, 300, 120, 60 };
+	static final Color TEXT_LEVEL_COLOR = new Color(255, 32, 128), TEXT_GAMEOVER_COLOR = new Color(32, 255, 64);
 	private static BufferedImage baseShipImage;
 
 	/**

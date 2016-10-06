@@ -27,7 +27,8 @@ import java.util.List;
 
 public class MultiplayerManager {
 	private static MultiplayerManager instance;
-	private static final int MESSAGE_TYPE_GAME = 0, MESSAGE_TYPE_PLAYER = 1, MESSAGE_TYPE_ASTEROIDS = 2, MESSAGE_TYPE_BULLET = 3;
+	private static final int MESSAGE_TYPE_GAME = 0, MESSAGE_TYPE_LEVEL = 1, MESSAGE_TYPE_ASTEROIDS = 2,
+			MESSAGE_TYPE_PLAYER = 3, MESSAGE_TYPE_BULLET = 4;
 	private static final int MESSAGE_TYPE = 0, IS_STARTED = 1, IS_PAUSED = 2,
 			PLAYER_ID = 1, POSX = 2, POSY = 3, ROTATION = 4, ACCEL = 5, DESTROYED = 6, SCORE = 7, LIVES = 8;
 	private Socket clientSocket;
@@ -82,6 +83,9 @@ public class MultiplayerManager {
 						switch (Integer.parseInt(data[MESSAGE_TYPE])) {
 						case MESSAGE_TYPE_GAME:
 							onReceiveGameData(Boolean.parseBoolean(data[IS_STARTED]), Boolean.parseBoolean(data[IS_PAUSED]));
+							break;
+						case MESSAGE_TYPE_LEVEL:
+							onReceiveLevel(Integer.parseInt(data[1]));
 							break;
 						case MESSAGE_TYPE_ASTEROIDS:
 							List<Asteroid> asteroids = null;
@@ -218,6 +222,14 @@ public class MultiplayerManager {
 		out.println(data);
 	}
 
+	void sendLevel() {
+		if (isClient || out == null) {
+			return;
+		}
+		String data = MESSAGE_TYPE_LEVEL + " " + LevelManager.getLevel();
+		out.println(data);
+	}
+
 	/** Sends all data for all asteroids. */
 	void sendAsteroids() {
 		if (isClient || out == null) {
@@ -338,6 +350,10 @@ public class MultiplayerManager {
 	private void onReceiveGameData(boolean isStarted, boolean isPaused) {
 		Simulation.setStarted(isStarted);
 		Simulation.setPaused(isPaused);
+	}
+
+	private void onReceiveLevel(int level) {
+		LevelManager.startLevel(level);
 	}
 
 	private void onReceivePlayerData(int playerId, float posX, float posY, int rotationDeg, boolean thrust,
