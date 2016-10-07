@@ -28,9 +28,10 @@ import java.util.List;
 public class MultiplayerManager {
 	private static MultiplayerManager instance;
 	private static final int MESSAGE_TYPE_GAME = 0, MESSAGE_TYPE_LEVEL = 1, MESSAGE_TYPE_ASTEROIDS = 2,
-			MESSAGE_TYPE_PLAYER = 3, MESSAGE_TYPE_BULLET = 4;
-	private static final int MESSAGE_TYPE = 0, IS_STARTED = 1, IS_PAUSED = 2,
-			PLAYER_ID = 1, POSX = 2, POSY = 3, ROTATION = 4, ACCEL = 5, DESTROYED = 6, SCORE = 7, LIVES = 8;
+			MESSAGE_TYPE_PLAYER = 3, MESSAGE_TYPE_BULLET = 4, MESSAGE_TYPE = 0, IS_STARTED = 1, IS_PAUSED = 2,
+			ASTEROIDS_DATA_SIZE = 5, ASTEROID_POSX = 1, ASTEROID_POSY = 2, ASTEROID_DIR = 3, ASTEROID_VEL = 4, ASTEROID_SIZE = 5, 
+			PLAYER_ID = 1, POSX = 2, POSY = 3, DIRECTION = 4, ACCEL = 5, DESTROYED = 6, SCORE = 7, LIVES = 8,
+			SHIP_BULLET_DATA_SIZE = 3, SHIP_BULLET_POSX = 9, SHIP_BULLET_POSY = 10, SHIP_BULLET_DIR = 11;
 	private Socket clientSocket;
 	private ServerSocket serverSocket;
 	private PrintWriter out;
@@ -89,31 +90,36 @@ public class MultiplayerManager {
 							break;
 						case MESSAGE_TYPE_ASTEROIDS:
 							List<Asteroid> asteroids = null;
-							if (data.length > 1) {
+							if (data.length > ASTEROID_POSX) {
 								asteroids = new ArrayList<Asteroid>();
-								for (int i = 1; i + 4 < data.length; i += 5) {
-									asteroids.add(new Asteroid(Float.parseFloat(data[i]), Float.parseFloat(data[i+1]), Integer.parseInt(data[i+2]),
-											Integer.parseInt(data[i+3]), Asteroid.Size.valueOf(data[i+4])));
+								for (int i = 0; i*ASTEROIDS_DATA_SIZE+ASTEROID_POSX < data.length; i++) {
+									asteroids.add(new Asteroid(Float.parseFloat(data[i*ASTEROIDS_DATA_SIZE+ASTEROID_POSX]),
+											Float.parseFloat(data[i*ASTEROIDS_DATA_SIZE+ASTEROID_POSY]),
+											Integer.parseInt(data[i*ASTEROIDS_DATA_SIZE+ASTEROID_DIR]),
+											Integer.parseInt(data[i*ASTEROIDS_DATA_SIZE+ASTEROID_VEL]),
+											Asteroid.Size.valueOf(data[i*ASTEROIDS_DATA_SIZE+ASTEROID_SIZE])));
 								}
 							}
 							onReceiveAsteroidData(asteroids);
 							break;
 						case MESSAGE_TYPE_PLAYER:
 							List<Bullet> bullets = null;
-							if (data.length > 7) {
+							if (data.length > SHIP_BULLET_POSX) {
 								bullets = new ArrayList<Bullet>();
-								for (int i = 9; i + 2 < data.length; i += 3) {
-									bullets.add(new Bullet(Integer.parseInt(data[PLAYER_ID]), Float.parseFloat(data[i]),
-											Float.parseFloat(data[i+1]), Integer.parseInt(data[i+2])));
+								for (int i = 0; i*SHIP_BULLET_DATA_SIZE+SHIP_BULLET_POSX < data.length; i++) {
+									bullets.add(new Bullet(Integer.parseInt(data[PLAYER_ID]),
+											Float.parseFloat(data[i*SHIP_BULLET_DATA_SIZE+SHIP_BULLET_POSX]),
+											Float.parseFloat(data[i*SHIP_BULLET_DATA_SIZE+SHIP_BULLET_POSY]),
+											Integer.parseInt(data[i*SHIP_BULLET_DATA_SIZE+SHIP_BULLET_DIR])));
 								}
 							}
 							onReceivePlayerData(Integer.parseInt(data[PLAYER_ID]), Float.parseFloat(data[POSX]),
-									Float.parseFloat(data[POSY]), Integer.parseInt(data[ROTATION]), Boolean.parseBoolean(data[ACCEL]),
+									Float.parseFloat(data[POSY]), Integer.parseInt(data[DIRECTION]), Boolean.parseBoolean(data[ACCEL]),
 									Boolean.parseBoolean(data[DESTROYED]), Integer.parseInt(data[SCORE]), Integer.parseInt(data[LIVES]), bullets);
 							break;
 						case MESSAGE_TYPE_BULLET:
 							onReceiveFiredBulletData(new Bullet(Integer.parseInt(data[PLAYER_ID]), Float.parseFloat(data[POSX]),
-									Float.parseFloat(data[POSY]), Integer.parseInt(data[ROTATION])));
+									Float.parseFloat(data[POSY]), Integer.parseInt(data[DIRECTION])));
 							break;
 						}
 					} else {
@@ -218,16 +224,21 @@ public class MultiplayerManager {
 		if (out == null) {
 			return;
 		}
-		String data = MESSAGE_TYPE_GAME + " " + Simulation.isStarted() + " " + Simulation.isPaused();
-		out.println(data);
+		String[] data = new String[3];
+		data[MESSAGE_TYPE] = Integer.toString(MESSAGE_TYPE_GAME);
+		data[IS_STARTED] = Boolean.toString(Simulation.isStarted());
+		data[IS_PAUSED] = Boolean.toString(Simulation.isPaused());
+		out.println(String.join(" ", data));
 	}
 
 	void sendLevel() {
 		if (isClient || out == null) {
 			return;
 		}
-		String data = MESSAGE_TYPE_LEVEL + " " + LevelManager.getLevel();
-		out.println(data);
+		String[] data = new String[3];
+		data[MESSAGE_TYPE] = Integer.toString(MESSAGE_TYPE_LEVEL);
+		data[1] = Integer.toString(LevelManager.getLevel());
+		out.println(String.join(" ", data));
 	}
 
 	/** Sends all data for all asteroids. */
@@ -235,13 +246,19 @@ public class MultiplayerManager {
 		if (isClient || out == null) {
 			return;
 		}
-		String data = Integer.toString(MESSAGE_TYPE_ASTEROIDS);
+		String[] data = new String[1 + 5 * Asteroid.getAsteroids().size()];
+		data[MESSAGE_TYPE] = Integer.toString(MESSAGE_TYPE_ASTEROIDS);
 		synchronized (Asteroid.getAsteroids()) {
-			for (Asteroid a : Asteroid.getAsteroids()) {
-				data += " " + a.pos.x + " " + a.pos.y + " " + a.direction + " " + a.velocity + " " + a.getSize().name();
+			for (int i = 0; i < Asteroid.getAsteroids().size(); i++) {
+				Asteroid a = Asteroid.getAsteroids().get(i);
+				data[i*ASTEROIDS_DATA_SIZE+ASTEROID_POSX] = Float.toString(a.pos.x);
+				data[i*ASTEROIDS_DATA_SIZE+ASTEROID_POSY] = Float.toString(a.pos.y);
+				data[i*ASTEROIDS_DATA_SIZE+ASTEROID_DIR] = Integer.toString(a.direction);
+				data[i*ASTEROIDS_DATA_SIZE+ASTEROID_VEL] = Integer.toString(a.velocity);
+				data[i*ASTEROIDS_DATA_SIZE+ASTEROID_SIZE] = a.getSize().name();
 			}
 		}
-		out.println(data);
+		out.println(String.join(" ", data));
 	}
 
 	/**
@@ -252,14 +269,25 @@ public class MultiplayerManager {
 		if (out == null) {
 			return;
 		}
-		String data = MESSAGE_TYPE_PLAYER + " " + ShipManager.getShips().indexOf(ship) + " " + ship.pos.x + " " + ship.pos.y
-				+ " " + ship.rotateDeg + " " + ship.isAccelerating + " " + ship.isDestroyed() + " " + ship.getScore() + " " + ship.getLives();
+		String[] data = new String[9 + 3 * ship.getBullets().size()];
+		data[MESSAGE_TYPE] = Integer.toString(MESSAGE_TYPE_PLAYER);
+		data[PLAYER_ID] = Integer.toString(ShipManager.getShips().indexOf(ship));
+		data[POSX] = Float.toString(ship.pos.x);
+		data[POSY] = Float.toString(ship.pos.y);
+		data[DIRECTION] = Integer.toString(ship.rotateDeg);
+		data[ACCEL] = Boolean.toString(ship.isAccelerating);
+		data[DESTROYED] = Boolean.toString(ship.isDestroyed());
+		data[SCORE] = Integer.toString(ship.getScore());
+		data[LIVES] = Integer.toString(ship.getLives());
 		synchronized (ship.getBullets()) {
-			for (Bullet b : ship.getBullets()) {
-				data += " " + b.pos.x + " " + b.pos.y + " " + b.direction;
+			for (int i = 0; i < ship.getBullets().size(); i++) {
+				Bullet b = ship.getBullets().get(i);
+				data[i*SHIP_BULLET_DATA_SIZE+SHIP_BULLET_POSX] = Float.toString(b.pos.x);
+				data[i*SHIP_BULLET_DATA_SIZE+SHIP_BULLET_POSY] = Float.toString(b.pos.y);
+				data[i*SHIP_BULLET_DATA_SIZE+SHIP_BULLET_DIR] = Integer.toString(b.direction);
 			}
 		}
-		out.println(data);
+		out.println(String.join(" ", data));
 	}
 
 	/**
@@ -287,8 +315,13 @@ public class MultiplayerManager {
 		if (out == null) {
 			return;
 		}
-		String data = MESSAGE_TYPE_BULLET + " " + bullet.getPlayerId() + " " + bullet.pos.x + " " + bullet.pos.y + " " + bullet.direction;
-		out.println(data);
+		String[] data = new String[5];
+		data[MESSAGE_TYPE] = Integer.toString(MESSAGE_TYPE_BULLET);
+		data[PLAYER_ID] = Integer.toString(bullet.getPlayerId());
+		data[POSX] = Float.toString(bullet.pos.x);
+		data[POSY] = Float.toString(bullet.pos.y);
+		data[DIRECTION] = Integer.toString(bullet.direction);
+		out.println(String.join(" ", data));
 	}
 
 	private String receive() {

@@ -81,6 +81,9 @@ public enum Audio {
 			if (isMusic) {
 				stopAll(true);
 			}
+			if (loop && player != null) {
+				player.stop = true;
+			}
 			player = new AudioPlayer(loop);
 			player.start();
 		}
@@ -97,6 +100,11 @@ public enum Audio {
 	}
 
 	void stop() {
+		if (equals(THRUST)) {
+			for (Ship ship : ShipManager.getShips()) {
+				if (ship.isAccelerating) return;
+			}
+		}
 		if (player != null) {
 			player.stop = true;
 			player = null;

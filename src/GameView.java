@@ -158,6 +158,13 @@ public class GameView extends JComponent implements KeyListener {
 		buttonMusic.setMnemonic(KeyEvent.VK_M);
 		buttonHelp.setMnemonic(KeyEvent.VK_H);
 		buttonAbout.setMnemonic(KeyEvent.VK_A);
+		button1.setEnabled(false);
+		button2.setEnabled(false);
+		button3.setEnabled(false);
+		button4.setEnabled(false);
+		buttonPlayers.setEnabled(false);
+		buttonHelp.setEnabled(false);
+		buttonAbout.setEnabled(false);
 		buttonStart.addActionListener(new ActionListener() {
 			@Override
 			public void actionPerformed(ActionEvent e) {
@@ -299,6 +306,7 @@ public class GameView extends JComponent implements KeyListener {
 			case KeyEvent.VK_RIGHT:
 				ship.rotateRight();
 				break;
+			case KeyEvent.VK_SPACE:
 			case KeyEvent.VK_CONTROL:
 				ship.fire();
 				break;
