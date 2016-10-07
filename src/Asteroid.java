@@ -25,14 +25,26 @@ import java.util.Random;
 import javax.imageio.ImageIO;
 
 public final class Asteroid extends Entity {
-	public enum Size { LARGE, MEDIUM, SMALL }
 	private static final List<Asteroid> ASTEROIDS = new ArrayList<Asteroid>();
 	private static final int MAX_ASTEROIDS = 8, MIN_SPEED = 2, MAX_SPEED = 8;
 	private static Image[] image = new Image[3];
 	private static final Random random = new Random();
 	private Size size;
 	private AffineTransform trans = new AffineTransform();
-	
+	enum Size {
+		LARGE(20), MEDIUM(50), SMALL(100);
+
+		private int scoreValue;
+
+		private Size(int scoreValue) {
+			this.scoreValue = scoreValue;
+		}
+
+		int getScoreValue() {
+			return scoreValue;
+		}
+	}
+
 	private Asteroid(float x, float y, int direction, int velocity) {
 		this(x, y, direction, velocity, Size.LARGE);
 	}

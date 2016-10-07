@@ -34,7 +34,8 @@ public enum Audio {
 	EXPLODE_PLAYER("snd/explode_player.wav"),
 	EXPLODE_LARGE("snd/explode_large.wav"),
 	EXPLODE_MEDIUM("snd/explode_medium.wav"),
-	EXPLODE_SMALL("snd/explode_small.wav");
+	EXPLODE_SMALL("snd/explode_small.wav"),
+	EXTRA_LIFE("snd/extra_life.wav");
 
 	static void init() {
 		values();

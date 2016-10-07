@@ -56,7 +56,7 @@ public class RenderUtils {
 		double lifeWidth = width * lifeScale - 2;
 		double lifeRadius = radius * lifeScale;
 		AffineTransform trans = new AffineTransform();
-		for (int i = 0; i < 5; i++) {
+		for (int i = 0; i < ship.getMaxLives(); i++) {
 			if (i < lives) {
 				trans.setToTranslation(x + (i * lifeWidth), y - lifeRadius);
 				trans.scale(lifeScale, lifeScale);

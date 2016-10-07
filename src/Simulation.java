@@ -150,17 +150,7 @@ public class Simulation {
 	private static void updateScore(Ship ship, Bullet b) {
 		Asteroid.Size hitAsteroidSize = b.getHitAsteroidSize();
 		if (hitAsteroidSize != null) {
-			switch (hitAsteroidSize) {
-			case LARGE:
-				ship.addScore(20);
-				break;
-			case MEDIUM:
-				ship.addScore(50);
-				break;
-			case SMALL:
-				ship.addScore(100);
-				break;
-			}
+			ship.addScore(hitAsteroidSize.getScoreValue());
 			b.setHitAsteroidSize(null);
 		}
 	}

@@ -29,13 +29,13 @@ import javax.imageio.ImageIO;
 
 
 public final class Ship extends Entity {
-	private static final int THRUST = 1, ROTATE_SPEED = 1, MAX_BULLETS = 4, RESPAWN_DELAY = 2000, MATERIALIZE_TIME = 300;
+	private static final int THRUST = 1, ROTATE_SPEED = 1, MAX_BULLETS = 4, RESPAWN_DELAY = 2000, MATERIALIZE_TIME = 300, NEW_SHIP_SCORE = 10000;
 	private BufferedImage image, imageSpawning;
 	private Image[] thrustImages;
 	private int thrustRadius;
 	private final AffineTransform trans = new AffineTransform();
 	private final List<Bullet> BULLETS = new ArrayList<Bullet>(MAX_BULLETS);
-	private int score = 0, lives = 5;
+	private int score = 0, lives = 5, maxLives = lives;
 	private long birthTime, aliveTime;
 	
 	/**
@@ -236,6 +236,11 @@ public final class Ship extends Entity {
 		this.lives = lives;
 	}
 
+	/** @return The highest number of lives this ship has had. */
+	int getMaxLives() {
+		return maxLives;
+	}
+
 	int getScore() {
 		return score;
 	}
@@ -244,8 +249,15 @@ public final class Ship extends Entity {
 		this.score = score;
 	}
 
-	void addScore(int score) {
-		this.score += score;
+	void addScore(int scoreToAdd) {
+		if (score / NEW_SHIP_SCORE < (score + scoreToAdd) / NEW_SHIP_SCORE) {
+			lives++;
+			if (lives > maxLives) {
+				maxLives = lives;
+			}
+			Audio.EXTRA_LIFE.play();
+		}
+		score += scoreToAdd;
 	}
 
 	/**
