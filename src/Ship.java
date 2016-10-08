@@ -40,15 +40,18 @@ public final class Ship extends Entity {
 	
 	/**
 	 * Creates a new ship, initially not spawned. Call {@link #spawn(int, int)} to spawn the ship.
-	 * @throws IOException if thrust images could not be read.
 	 */
-	Ship() throws IOException {
+	Ship() {
 		super(0, 0, 0, 0, THRUST, ROTATE_SPEED);
 		super.destroy();
 		setPlayerColor(0);
 		radius = image.getWidth(null) / 2;
-		thrustImages = new Image[] {ImageIO.read(getClass().getClassLoader().getResource("img/thrust1.png")),
-		                            ImageIO.read(getClass().getClassLoader().getResource("img/thrust2.png"))};
+		try {
+			thrustImages = new Image[] {ImageIO.read(getClass().getClassLoader().getResource("img/thrust1.png")),
+			                            ImageIO.read(getClass().getClassLoader().getResource("img/thrust2.png"))};
+		} catch (IOException e) {
+			e.printStackTrace();
+		}
 		thrustRadius = thrustImages[0].getWidth(null) / 2;
 	}
 	
@@ -217,6 +220,7 @@ public final class Ship extends Entity {
 		} else {
 			boolean gameOver = true;
 			for (Ship ship : ShipManager.getShips()) {
+				if (ship == null) continue;
 				if (!ship.isDestroyed() || ship.getLives() > 0) {
 					gameOver = false;
 					break;

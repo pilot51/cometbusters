@@ -14,7 +14,6 @@
  * limitations under the License.
  */
 
-import java.io.IOException;
 import java.util.ArrayList;
 
 public class ShipManager {
@@ -28,25 +27,24 @@ public class ShipManager {
 
 	static Ship getLocalShip() {
 		if (localShip == null) {
-			try {
-				localShip = new Ship();
-			} catch (IOException e) {
-				e.printStackTrace();
-			}
+			localShip = new Ship();
 		}
 		return localShip;
 	}
 
 	static ArrayList<Ship> getShips() {
 		if (SHIPS.isEmpty()) {
-			SHIPS.add(getLocalShip());
+			addShip(getLocalShip(), 0);
 		}
 		return SHIPS;
 	}
 
 	static void addShip(Ship ship, int id) {
 		synchronized (SHIPS) {
-			if (id == SHIPS.size()) {
+			if (id >= SHIPS.size()) {
+				while (id > SHIPS.size()) {
+					SHIPS.add(null);
+				}
 				SHIPS.add(ship);
 			} else {
 				SHIPS.set(id, ship);
@@ -55,8 +53,20 @@ public class ShipManager {
 		ship.setPlayerColor(id);
 	}
 
+	/**
+	 * @param ship The ship to remove.
+	 * @return The player ID that was removed.
+	 */
+	static void removeShip(int id) {
+		synchronized (SHIPS) {
+			SHIPS.set(id, null);
+		}
+	}
+
 	static void clearShips() {
-		SHIPS.clear();
+		synchronized (SHIPS) {
+			SHIPS.clear();
+		}
 		localShip.setPlayerColor(0);
 	}
 

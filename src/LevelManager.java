@@ -37,6 +37,7 @@ public class LevelManager {
 		} else {
 			startLevel(1);
 			for (Ship ship : ShipManager.getShips()) {
+				if (ship == null) continue;
 				ship.reset(true);
 				ship.spawn();
 			}
@@ -48,6 +49,7 @@ public class LevelManager {
 	static void stopGame() {
 		Simulation.setStarted(false);
 		for (Ship ship : ShipManager.getShips()) {
+			if (ship == null) continue;
 			ship.terminate();
 		}
 		LevelManager.createBackgroundAsteroids();

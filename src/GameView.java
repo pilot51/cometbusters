@@ -75,26 +75,33 @@ public class GameView extends JComponent implements KeyListener {
 		g2d.drawImage(imgBg, 0, 0, null);
 		g2d.setFont(new Font("Arial", Font.PLAIN, 22));
 		List<Ship> ships = ShipManager.getShips();
-		for (int i = 0; i < ships.size(); i++) {
-			int x = 0, y = 0;
-			if (i == 0 || i == 3) {
-				x = 30;
-			} else {
-				x = VIEW_WIDTH - 118;
+		synchronized (ships) {
+			for (int i = 0; i < ships.size(); i++) {
+				Ship ship = ships.get(i);
+				if (ship == null) continue;
+				int x = 0, y = 0;
+				if (i == 0 || i == 3) {
+					x = 30;
+				} else {
+					x = VIEW_WIDTH - 118;
+				}
+				if (i == 0 || i == 2) {
+					y = 30;
+				} else {
+					y = VIEW_HEIGHT - 42;
+				}
+				g2d.setColor(RenderUtils.PLAYER_COLORS[i]);
+				g2d.drawString(String.format("%07d", ships.get(i).getScore()), x, y);
+				RenderUtils.drawLives(g2d, ships.get(i).getLives(), RenderUtils.PLAYER_COLORS[i], x, y + 14);
 			}
-			if (i == 0 || i == 2) {
-				y = 30;
-			} else {
-				y = VIEW_HEIGHT - 42;
-			}
-			g2d.setColor(RenderUtils.PLAYER_COLORS[i]);
-			g2d.drawString(String.format("%07d", ships.get(i).getScore()), x, y);
-			RenderUtils.drawLives(g2d, ships.get(i).getLives(), RenderUtils.PLAYER_COLORS[i], x, y + 14);
 		}
 		Asteroid.drawAsteroids(g2d);
-		for (Ship s : ships) {
-			s.drawShip(g2d);
-			Bullet.drawBullets(g2d, s);
+		synchronized (ships) {
+			for (Ship s : ships) {
+				if (s == null) continue;
+				s.drawShip(g2d);
+				Bullet.drawBullets(g2d, s);
+			}
 		}
 		if (LevelManager.isWaitingToStartLevel()) {
 			Font font = new Font(Font.SANS_SERIF, Font.BOLD, 100);

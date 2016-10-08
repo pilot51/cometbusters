@@ -83,6 +83,7 @@ public class Simulation {
 			}
 		} else {
 			for (Ship ship : ShipManager.getShips()) {
+				if (ship == null) continue;
 				for (Bullet b : ship.getBullets()) {
 					b.calculateMotion();
 				}
@@ -96,6 +97,7 @@ public class Simulation {
 		if (MultiplayerManager.getInstance().isClient()) return;
 		Ship localShip = ShipManager.getLocalShip();
 		for (Ship ship : ShipManager.getShips()) {
+			if (ship == null) continue;
 			// Ship vs. ship
 			if (ship != localShip && localShip.isContacting(ship)) {
 				localShip.collide(ship);
@@ -115,7 +117,7 @@ public class Simulation {
 					// Local bullet vs. remote ship
 					if (ship == localShip) {
 						for (Ship remoteShip : ShipManager.getShips()) {
-							if (remoteShip == localShip) continue;
+							if (remoteShip == null || remoteShip == localShip) continue;
 							if (bullet.isContacting(remoteShip)) {
 								bullet.collide(remoteShip);
 								break;

@@ -103,6 +103,7 @@ public enum Audio {
 	void stop() {
 		if (equals(THRUST)) {
 			for (Ship ship : ShipManager.getShips()) {
+				if (ship == null) continue;
 				if (ship.isAccelerating) return;
 			}
 		}
