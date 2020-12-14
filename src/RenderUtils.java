@@ -79,7 +79,7 @@ public class RenderUtils {
 	private static BufferedImage getBaseShipImage() {
 		if (baseShipImage == null) {
 			try {
-				baseShipImage = ImageIO.read(Thread.currentThread().getContextClassLoader().getResource("img/ship.png"));
+				baseShipImage = ImageIO.read(RenderUtils.class.getResource("ship.png"));
 			} catch (IOException e) {
 				e.printStackTrace();
 				return null;

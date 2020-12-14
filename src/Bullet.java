@@ -50,7 +50,7 @@ public final class Bullet extends Entity {
 	 * @throws IOException if image could not be read.
 	 */
 	static void init() throws IOException {
-		image = ImageIO.read(Bullet.class.getClassLoader().getResource("img/deadly_bullet.png"));
+		image = ImageIO.read(Bullet.class.getResource("deadly_bullet.png"));
 		radius = image.getWidth(null) / 2;
 	}
 	

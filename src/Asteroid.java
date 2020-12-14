@@ -63,9 +63,9 @@ public final class Asteroid extends Entity {
 		if (level < 1) return;
 		level = (level - 1) % 8 + 1;
 		try {
-			image[Size.LARGE.ordinal()] = ImageIO.read(Asteroid.class.getClassLoader().getResource("img/asteroid" + level + "_large.png"));
-			image[Size.MEDIUM.ordinal()] = ImageIO.read(Asteroid.class.getClassLoader().getResource("img/asteroid" + level + "_medium.png"));
-			image[Size.SMALL.ordinal()] = ImageIO.read(Asteroid.class.getClassLoader().getResource("img/asteroid" + level + "_small.png"));
+			image[Size.LARGE.ordinal()] = ImageIO.read(Asteroid.class.getResource("asteroid" + level + "_large.png"));
+			image[Size.MEDIUM.ordinal()] = ImageIO.read(Asteroid.class.getResource("asteroid" + level + "_medium.png"));
+			image[Size.SMALL.ordinal()] = ImageIO.read(Asteroid.class.getResource("asteroid" + level + "_small.png"));
 		} catch (IOException e) {
 			e.printStackTrace();
 		}

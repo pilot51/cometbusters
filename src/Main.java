@@ -34,7 +34,7 @@ public class Main extends JFrame {
 	private Main() {
 		super("Comet Busters");
 		setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
-		setIconImage(new ImageIcon(getClass().getClassLoader().getResource("img/icon.png")).getImage());
+		setIconImage(new ImageIcon(getClass().getResource("icon.png")).getImage());
 		try {
 			GameView gv = new GameView();
 			setJMenuBar(gv.createMenu());

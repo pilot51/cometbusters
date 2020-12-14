@@ -25,17 +25,17 @@ import javax.sound.sampled.SourceDataLine;
 import javax.sound.sampled.UnsupportedAudioFileException;
 
 public enum Audio {
-	MUSIC_GAME("snd/comet.mid"),
-	MUSIC_DEATH("snd/comet1.mid"),
-	MUSIC_HIGHSCORE("snd/comet2.mid"),
-	THRUST("snd/thrust.wav"),
-	SHOOT("snd/shoot.wav"),
-	SPAWN("snd/spawn.wav"),
-	EXPLODE_PLAYER("snd/explode_player.wav"),
-	EXPLODE_LARGE("snd/explode_large.wav"),
-	EXPLODE_MEDIUM("snd/explode_medium.wav"),
-	EXPLODE_SMALL("snd/explode_small.wav"),
-	EXTRA_LIFE("snd/extra_life.wav");
+	MUSIC_GAME("comet.mid"),
+	MUSIC_DEATH("comet1.mid"),
+	MUSIC_HIGHSCORE("comet2.mid"),
+	THRUST("thrust.wav"),
+	SHOOT("shoot.wav"),
+	SPAWN("spawn.wav"),
+	EXPLODE_PLAYER("explode_player.wav"),
+	EXPLODE_LARGE("explode_large.wav"),
+	EXPLODE_MEDIUM("explode_medium.wav"),
+	EXPLODE_SMALL("explode_small.wav"),
+	EXTRA_LIFE("extra_life.wav");
 
 	static void init() {
 		values();
@@ -136,7 +136,7 @@ public enum Audio {
 		public void run() {
 			AudioInputStream stream;
 			try {
-				stream = AudioSystem.getAudioInputStream(getClass().getClassLoader().getResource(filename));
+				stream = AudioSystem.getAudioInputStream(getClass().getResource(filename));
 			} catch (UnsupportedAudioFileException e) {
 				e.printStackTrace();
 				return;

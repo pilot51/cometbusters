@@ -47,8 +47,8 @@ public final class Ship extends Entity {
 		setPlayerColor(0);
 		radius = image.getWidth(null) / 2;
 		try {
-			thrustImages = new Image[] {ImageIO.read(getClass().getClassLoader().getResource("img/thrust1.png")),
-			                            ImageIO.read(getClass().getClassLoader().getResource("img/thrust2.png"))};
+			thrustImages = new Image[] {ImageIO.read(getClass().getResource("thrust1.png")),
+			                            ImageIO.read(getClass().getResource("thrust2.png"))};
 		} catch (IOException e) {
 			e.printStackTrace();
 		}

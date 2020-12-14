@@ -1,2 +1,13 @@
-bin/
-.settings/
+### IntelliJ IDEA ###
+.idea/
+*.iml
+*.ipr
+*.iws
+
+### Gradle ###
+.gradle
+build/
+!gradle-wrapper.jar
+.gradletasknamecache
+**/build/
+

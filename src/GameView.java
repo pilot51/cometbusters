@@ -51,7 +51,7 @@ public class GameView extends JComponent implements KeyListener {
 	 */
 	GameView() throws IOException {
 		setPreferredSize(new Dimension(VIEW_WIDTH, VIEW_HEIGHT));
-		imgBg = ImageIO.read(getClass().getClassLoader().getResource("img/background.png"));
+		imgBg = ImageIO.read(getClass().getResource("background.png"));
 		Audio.init();
 		Bullet.init();
 		LevelManager.createBackgroundAsteroids();

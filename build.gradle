@@ -1,0 +1,20 @@
+plugins {
+	id 'java'
+}
+
+sourceSets {
+	main {
+		java {
+			srcDirs = ['src']
+		}
+		resources {
+			srcDirs = ['src/img', 'src/snd']
+		}
+	}
+}
+
+repositories {
+}
+
+dependencies {
+}
