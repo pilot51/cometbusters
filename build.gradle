@@ -1,5 +1,12 @@
 plugins {
 	id 'java'
+	id 'org.jetbrains.kotlin.jvm' version '1.4.21'
+}
+
+compileKotlin {
+	kotlinOptions {
+		jvmTarget = "1.8"
+	}
 }
 
 sourceSets {
@@ -14,7 +21,9 @@ sourceSets {
 }
 
 repositories {
+	mavenCentral()
 }
 
 dependencies {
+	implementation "org.jetbrains.kotlin:kotlin-stdlib-jdk8"
 }

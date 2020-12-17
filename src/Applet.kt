@@ -14,24 +14,26 @@
  * limitations under the License.
  */
 
-import java.io.IOException;
+import java.io.IOException
+import javax.swing.JApplet
+import kotlin.system.exitProcess
 
-import javax.swing.JApplet;
-
-public class Applet extends JApplet {
-	private static final long serialVersionUID = 1L;
-
-	public void init() {
+class Applet : JApplet() {
+	override fun init() {
 		try {
-			GameView gv = new GameView();
-			setJMenuBar(gv.createMenu());
-			add(gv);
-			setVisible(true);
-			setSize(1024, 768);
-		} catch (IOException e) {
-			System.err.println("Error loading images!");
-			e.printStackTrace();
-			System.exit(1);
+			val gv = GameView()
+			jMenuBar = gv.createMenu()
+			add(gv)
+			isVisible = true
+			setSize(1024, 768)
+		} catch (e: IOException) {
+			System.err.println("Error loading images!")
+			e.printStackTrace()
+			exitProcess(1)
 		}
+	}
+
+	companion object {
+		private const val serialVersionUID = 1L
 	}
 }
