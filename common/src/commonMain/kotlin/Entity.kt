@@ -14,6 +14,7 @@
  * limitations under the License.
  */
 
+import Platform.Utils.Math
 import kotlin.math.abs
 import kotlin.math.cos
 import kotlin.math.sin
@@ -28,7 +29,7 @@ import kotlin.math.sin
  * @param acceleration Forward acceleration applied when [isAccelerating] is true.
  * @param rotationSpeed Rotation speed applied when [rotateLeft] or [rotateRight] is called, stopped with [rotateStop].
  */
-abstract class Entity @JvmOverloads internal constructor(
+abstract class Entity(
 	x: Float,
 	y: Float,
 	/** Initial direction of travel in degrees. */

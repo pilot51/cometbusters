@@ -15,11 +15,9 @@
  */
 
 import Asteroid.Size
-import java.awt.Graphics2D
-import java.awt.Image
-import java.awt.geom.AffineTransform
-import java.io.IOException
-import javax.imageio.ImageIO
+import Platform.Renderer.RenderView2D
+import Platform.Renderer.Transform2D
+import Platform.Resources.Image
 
 /**
  * Creates a new bullet.
@@ -31,7 +29,7 @@ class Bullet internal constructor(val playerId: Int, x: Float, y: Float, deg: In
 	/** Size of asteroid that this bullet hit. Null if it has not hit an asteroid. */
 	var hitAsteroidSize: Size? = null
 	private val timeCreated = Simulation.simulationTime
-	private val trans = AffineTransform()
+	private val trans = Transform2D()
 
 	init {
 		super.radius = bulletRadius
@@ -45,7 +43,7 @@ class Bullet internal constructor(val playerId: Int, x: Float, y: Float, deg: In
 		super.calculateMotion()
 	}
 
-	private val transform: AffineTransform
+	private val transform: Transform2D
 		get() {
 			trans.setToTranslation((pos.x - bulletRadius).toDouble(), (pos.y - bulletRadius).toDouble())
 			return trans
@@ -60,24 +58,16 @@ class Bullet internal constructor(val playerId: Int, x: Float, y: Float, deg: In
 		private const val DURATION: Long = 2000
 		private const val SPEED = 25
 
-		/**
-		 * Loads bullet image.
-		 * @throws IOException if image could not be read.
-		 */
-		@Throws(IOException::class)
+		/** Loads bullet image. */
 		fun init() {
-			image = ImageIO.read(Bullet::class.java.getResource("deadly_bullet.png")).apply {
-				bulletRadius = getWidth(null) / 2
+			image = Image("img/deadly_bullet.png") {
+				bulletRadius = it.width / 2
 			}
 		}
 
-		fun drawBullets(g2d: Graphics2D, ship: Ship) {
-			synchronized(ship.bullets) {
-				for (b in ship.bullets) {
-					if (!b.isDestroyed) {
-						g2d.drawImage(image, b.transform, null)
-					}
-				}
+		fun drawBullets(view2D: RenderView2D, ship: Ship) {
+			ship.bullets.filter { !it.isDestroyed }.forEach {
+				view2D.drawImage(image!!, it.transform)
 			}
 		}
 	}

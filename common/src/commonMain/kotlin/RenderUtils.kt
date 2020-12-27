@@ -14,12 +14,10 @@
  * limitations under the License.
  */
 
-import java.awt.Color
-import java.awt.Graphics2D
-import java.awt.geom.AffineTransform
-import java.awt.image.BufferedImage
-import java.io.IOException
-import javax.imageio.ImageIO
+import Platform.Renderer.RenderView2D
+import Platform.Renderer.Transform2D
+import Platform.Resources.Color
+import Platform.Resources.MutableImage
 import kotlin.math.max
 import kotlin.math.min
 
@@ -28,68 +26,48 @@ object RenderUtils {
 	private val PLAYER_HUES = intArrayOf(180, 300, 120, 60)
 	val TEXT_LEVEL_COLOR = Color(255, 32, 128)
 	val TEXT_GAMEOVER_COLOR = Color(32, 255, 64)
-	private var baseShipImage: BufferedImage? = null
-		get() {
-			if (field == null) {
-				field = try {
-					ImageIO.read(RenderUtils::class.java.getResource("ship.png"))
-				} catch (e: IOException) {
-					e.printStackTrace()
-					return null
-				}
-			}
-			return field
-		}
+	private val baseShipImage = MutableImage("img/ship.png")
 
 	/**
 	 * Converts all pixels from the source image that aren't fully transparent to the specified color.
 	 * @param src Source image to convert.
 	 * @param fillColor The desired color.
-	 * @return The converted image as a new [BufferedImage].
+	 * @return The converted image as a new [MutableImage].
 	 */
-	fun convertImageToSingleColorWithAlpha(src: BufferedImage?, fillColor: Color?): BufferedImage {
-		val newImage = BufferedImage(src!!.getWidth(null), src.getHeight(null), BufferedImage.TYPE_INT_ARGB)
-		for (x in 0 until src.width) {
-			for (y in 0 until src.height) {
-				if (Color(src.getRGB(x, y), true).alpha == 255) {
-					newImage.setRGB(x, y, fillColor!!.rgb)
-				}
-			}
-		}
-		return newImage
-	}
+	fun convertImageToSingleColorWithAlpha(src: MutableImage, fillColor: Color) =
+		MutableImage(src).apply { setSingleColor(fillColor.rgba) }
 
-	fun drawLives(g2d: Graphics2D, lives: Int, color: Color?, x: Int, y: Int) {
+	fun drawLives(view2D: RenderView2D, lives: Int, color: Color, x: Int, y: Int) {
 		val ship = ShipManager.localShip
 		val imageLife = convertImageToSingleColorWithAlpha(baseShipImage, color)
 		val imageUsedLife = convertImageToSingleColorWithAlpha(baseShipImage, Color.WHITE)
-		val width = baseShipImage!!.getWidth(null)
+		val width = baseShipImage.width
 		val radius = width / 2
 		val lifeScale = 0.5
 		val lifeWidth = width * lifeScale - 2
 		val lifeRadius = radius * lifeScale
-		val trans = AffineTransform()
+		val trans = Transform2D()
 		for (i in 0 until ship.maxLives) {
 			if (i < lives) {
 				trans.setToTranslation(x + i * lifeWidth, y - lifeRadius)
 				trans.scale(lifeScale, lifeScale)
-				g2d.drawImage(imageLife, trans, null)
+				view2D.drawImage(imageLife, trans)
 			} else if (i == lives && ship.isSpawning) {
 				val spawnScale = lifeScale * (1 - ship.spawnProgress())
 				val scaledRadius = radius * spawnScale
 				trans.setToTranslation(x + i * lifeWidth + lifeRadius - scaledRadius, y - scaledRadius)
 				trans.scale(spawnScale, spawnScale)
-				g2d.drawImage(imageUsedLife, trans, null)
+				view2D.drawImage(imageUsedLife, trans)
 			} else {
 				val scaledRadius = 1.0
 				trans.setToTranslation(x + i * lifeWidth + lifeRadius - scaledRadius, y - scaledRadius)
 				trans.scale(scaledRadius / radius, scaledRadius / radius)
-				g2d.drawImage(imageUsedLife, trans, null)
+				view2D.drawImage(imageUsedLife, trans)
 			}
 		}
 	}
 
-	fun getPlayerShipImage(playerId: Int): BufferedImage? {
+	fun getPlayerShipImage(playerId: Int): MutableImage {
 		return if (playerId == 0) {
 			baseShipImage
 		} else {
@@ -103,29 +81,59 @@ object RenderUtils {
 	 * @param hue The hue value between 0 and 360.
 	 * @return A copy of the source image with the hue applied.
 	 */
-	private fun applyHue(src: BufferedImage?, hue: Int): BufferedImage {
-		val filteredImage = BufferedImage(src!!.getWidth(null), src.getHeight(null), BufferedImage.TYPE_INT_ARGB)
-		for (x in 0 until src.width) {
-			for (y in 0 until src.height) {
-				filteredImage.setRGB(x, y, adjustHue(Color(src.getRGB(x, y), true), hue.toFloat()).rgb)
-			}
-		}
-		return filteredImage
-	}
+	private fun applyHue(src: MutableImage, hue: Int) = MutableImage(src).apply { setHue(hue.toFloat()) }
 
 	// All below code for changing hue was copied with minor modifications from
 	// http://www.camick.com/java/source/HSLColor.java (blog post: https://tips4java.wordpress.com/2009/07/05/hsl-color)
-	private fun adjustHue(color: Color, degrees: Float): Color {
-		val hsl = fromRGB(color)
-		return toRGB(degrees, hsl[1], hsl[2], color.alpha / 255f)
+	fun adjustHue(rgba: Int, degrees: Float): Int {
+		val hsl = rgbToHsl(rgba)
+		return hslToRgb(degrees, hsl[1], hsl[2], getAlpha(rgba) / 255f)
 	}
 
-	private fun fromRGB(color: Color): FloatArray {
+	fun getAlpha(rgba: Int) = rgba shr 24 and 0xff
+
+	fun rgbaToIntArray(rgba: Int) = intArrayOf(
+		rgba shr 16 and 0xff, // r
+		rgba shr 8 and 0xff, // g
+		rgba shr 0 and 0xff, // b
+		rgba shr 24 and 0xff // a
+	)
+
+	fun rgbaToFloatArray(rgba: Int) = floatArrayOf(
+		(rgba shr 16 and 0xff) / 255f, // r
+		(rgba shr 8 and 0xff) / 255f, // g
+		(rgba shr 0 and 0xff) / 255f, // b
+		(rgba shr 24 and 0xff) / 255f // a
+	)
+
+	fun rgbaComponentsToInt(r: Int, g: Int, b: Int, a: Int): Int {
+		return (a and 0xFF shl 24) or
+			(r and 0xFF shl 16) or
+			(g and 0xFF shl 8) or
+			(b and 0xFF shl 0)
+	}
+
+	fun rgbaFloatComponentsToInt(r: Float, g: Float, b: Float, a: Float): Int {
+		return ((a * 255).toInt() and 0xFF shl 24) or
+			((r * 255).toInt() and 0xFF shl 16) or
+			((g * 255).toInt() and 0xFF shl 8) or
+			((b * 255).toInt() and 0xFF shl 0)
+	}
+
+	private fun componentToHex(c: Int): String {
+		val hex = c.toString(16)
+		return if (hex.length == 1) "0$hex" else hex
+	}
+
+	fun rgbaToHex(r: Int, g: Int, b: Int, a: Int = 255) =
+		"#${componentToHex(r)}${componentToHex(g)}${componentToHex(b)}${componentToHex(a)}"
+
+	private fun rgbToHsl(rgb: Int): FloatArray {
 		// Get RGB values in the range 0 - 1
-		val rgb = color.getRGBColorComponents(null)
-		val r = rgb[0]
-		val g = rgb[1]
-		val b = rgb[2]
+		val rgbFloats = rgbaToFloatArray(rgb)
+		val r = rgbFloats[0]
+		val g = rgbFloats[1]
+		val b = rgbFloats[2]
 		// Minimum and Maximum RGB values are used in the HSL calculations
 		val min = min(r, min(g, b))
 		val max = max(r, max(g, b))
@@ -148,7 +156,7 @@ object RenderUtils {
 		return floatArrayOf(h, s * 100, l * 100)
 	}
 
-	private fun toRGB(hue: Float, sat: Float, lum: Float, alpha: Float): Color {
+	private fun hslToRgb(hue: Float, sat: Float, lum: Float, alpha: Float): Int {
 		var h = hue
 		var s = sat
 		var l = lum
@@ -181,7 +189,7 @@ object RenderUtils {
 		r = min(r, 1.0f)
 		g = min(g, 1.0f)
 		b = min(b, 1.0f)
-		return Color(r, g, b, alpha)
+		return rgbaFloatComponentsToInt(r, g, b, alpha)
 	}
 
 	private fun hueToRGB(p: Float, q: Float, h: Float): Float {

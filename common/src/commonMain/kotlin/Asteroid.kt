@@ -14,12 +14,10 @@
  * limitations under the License.
  */
 
-import java.awt.Graphics2D
-import java.awt.Image
-import java.awt.geom.AffineTransform
-import java.io.IOException
-import java.util.*
-import javax.imageio.ImageIO
+import Platform.Renderer.RenderView2D
+import Platform.Renderer.Transform2D
+import Platform.Resources.Image
+import kotlin.random.Random
 
 class Asteroid internal constructor(
 	x: Float,
@@ -28,17 +26,15 @@ class Asteroid internal constructor(
 	velocity: Int,
 	val size: Size
 ) : Entity(x, y, direction, velocity) {
-	private val trans = AffineTransform()
+	private val trans = Transform2D()
 
-	enum class Size(val scoreValue: Int) {
-		LARGE(20),
-		MEDIUM(50),
-		SMALL(100);
+	init {
+		radius = image[size.ordinal]!!.width / 2
 	}
 
 	private constructor(x: Float, y: Float, direction: Int, velocity: Int) : this(x, y, direction, velocity, Size.LARGE)
 
-	private val transform: AffineTransform
+	private val transform: Transform2D
 		get() {
 			trans.setToTranslation((pos.x - radius).toDouble(), (pos.y - radius).toDouble())
 			return trans
@@ -57,19 +53,17 @@ class Asteroid internal constructor(
 			}
 			Size.SMALL -> Audio.EXPLODE_SMALL.play()
 		}
-		synchronized(asteroids) {
-			if (newSize != null) {
-				// Create smaller rocks
-				var newDir: Int
-				var newVel: Int
-				for (x in 1..2) {
-					newDir = random.nextInt(360)
-					newVel = MIN_SPEED + random.nextInt(1 + MAX_SPEED - MIN_SPEED)
-					asteroids.add(Asteroid(pos.x, pos.y, newDir, newVel, newSize))
-				}
+		if (newSize != null) {
+			// Create smaller rocks
+			var newDir: Int
+			var newVel: Int
+			for (x in 1..2) {
+				newDir = random.nextInt(360)
+				newVel = MIN_SPEED + random.nextInt(1 + MAX_SPEED - MIN_SPEED)
+				asteroids.add(Asteroid(pos.x, pos.y, newDir, newVel, newSize))
 			}
-			asteroids.remove(this)
 		}
+		asteroids.remove(this@Asteroid)
 		super.destroy()
 		if (asteroids.isEmpty()) {
 			LevelManager.nextLevel()
@@ -83,7 +77,7 @@ class Asteroid internal constructor(
 		private const val MIN_SPEED = 2
 		private const val MAX_SPEED = 8
 		private val image = arrayOfNulls<Image>(3)
-		private val random = Random()
+		private val random = Random.Default
 
 		/**
 		 * Loads asteroid images for the specified level.
@@ -93,10 +87,10 @@ class Asteroid internal constructor(
 			if (level < 1) return
 			val lvl = (level - 1) % 8 + 1
 			try {
-				image[Size.LARGE.ordinal] = ImageIO.read(Asteroid::class.java.getResource("asteroid" + lvl + "_large.png"))
-				image[Size.MEDIUM.ordinal] = ImageIO.read(Asteroid::class.java.getResource("asteroid" + lvl + "_medium.png"))
-				image[Size.SMALL.ordinal] = ImageIO.read(Asteroid::class.java.getResource("asteroid" + lvl + "_small.png"))
-			} catch (e: IOException) {
+				image[Size.LARGE.ordinal] = Image("img/asteroid${lvl}_large.png")
+				image[Size.MEDIUM.ordinal] = Image("img/asteroid${lvl}_medium.png")
+				image[Size.SMALL.ordinal] = Image("img/asteroid${lvl}_small.png")
+			} catch (e: Exception) {
 				e.printStackTrace()
 			}
 		}
@@ -110,33 +104,32 @@ class Asteroid internal constructor(
 			if (image[0] == null) {
 				setLevelImages(1)
 			}
-			synchronized(asteroids) {
-				asteroids.clear()
-				if (LevelManager.level > 0) {
-					while (asteroids.size < MAX_ASTEROIDS) {
-						val spawnTopBottom = random.nextBoolean() // Whether to spawn along the top/bottom instead of left/right edges.
-						asteroids.add(Asteroid((if (spawnTopBottom) random.nextInt(GameView.VIEW_WIDTH) else 0).toFloat(),
-								(if (spawnTopBottom) 0 else random.nextInt(GameView.VIEW_HEIGHT)).toFloat(),
-								random.nextInt(360),
-								MIN_SPEED + random.nextInt(1 + MAX_SPEED - MIN_SPEED)))
-					}
+			asteroids.clear()
+			if (LevelManager.level > 0) {
+				while (asteroids.size < MAX_ASTEROIDS) {
+					val spawnTopBottom =
+						random.nextBoolean() // Whether to spawn along the top/bottom instead of left/right edges.
+					asteroids.add(Asteroid(
+						(if (spawnTopBottom) random.nextInt(GameView.VIEW_WIDTH) else 0).toFloat(),
+						(if (spawnTopBottom) 0 else random.nextInt(GameView.VIEW_HEIGHT)).toFloat(),
+						random.nextInt(360),
+						MIN_SPEED + random.nextInt(1 + MAX_SPEED - MIN_SPEED)
+					))
 				}
 			}
 			MultiplayerManager.instance.sendAsteroids()
 		}
 
-		fun drawAsteroids(g2d: Graphics2D) {
-			synchronized(asteroids) {
-				for (a in asteroids) {
-					if (!a.isDestroyed) {
-						g2d.drawImage(image[a.size.ordinal], a.transform, null)
-					}
-				}
+		fun drawAsteroids(view2D: RenderView2D) {
+			asteroids.filter { !it.isDestroyed }.forEach {
+				view2D.drawImage(image[it.size.ordinal]!!, it.transform)
 			}
 		}
 	}
 
-	init {
-		radius = image[size.ordinal]!!.getWidth(null) / 2
+	enum class Size(val scoreValue: Int) {
+		LARGE(20),
+		MEDIUM(50),
+		SMALL(100);
 	}
 }

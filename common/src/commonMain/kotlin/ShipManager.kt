@@ -14,15 +14,14 @@
  * limitations under the License.
  */
 
-import java.util.*
-
 object ShipManager {
 	val localShip by lazy { Ship() }
 	private val MP_SPAWN_POSITIONS = arrayOf(
-			Entity.Position((GameView.VIEW_WIDTH / 4).toFloat(), (GameView.VIEW_HEIGHT / 4).toFloat()),
-			Entity.Position((GameView.VIEW_WIDTH * 3 / 4).toFloat(), (GameView.VIEW_HEIGHT * 3 / 4).toFloat()),
-			Entity.Position((GameView.VIEW_WIDTH * 3 / 4).toFloat(), (GameView.VIEW_HEIGHT / 4).toFloat()),
-			Entity.Position((GameView.VIEW_WIDTH / 4).toFloat(), (GameView.VIEW_HEIGHT * 3 / 4).toFloat()))
+		Entity.Position((GameView.VIEW_WIDTH / 4).toFloat(), (GameView.VIEW_HEIGHT / 4).toFloat()),
+		Entity.Position((GameView.VIEW_WIDTH * 3 / 4).toFloat(), (GameView.VIEW_HEIGHT * 3 / 4).toFloat()),
+		Entity.Position((GameView.VIEW_WIDTH * 3 / 4).toFloat(), (GameView.VIEW_HEIGHT / 4).toFloat()),
+		Entity.Position((GameView.VIEW_WIDTH / 4).toFloat(), (GameView.VIEW_HEIGHT * 3 / 4).toFloat())
+	)
 	val ships = ArrayList<Ship?>(4)
 		get() {
 			if (field.isEmpty()) {
@@ -33,25 +32,23 @@ object ShipManager {
 		}
 
 	fun addShip(ship: Ship, id: Int) {
-		synchronized(ships) {
-			if (id >= ships.size) {
-				while (id > ships.size) {
-					ships.add(null)
-				}
-				ships.add(ship)
-			} else {
-				ships.set(id, ship)
+		if (id >= ships.size) {
+			while (id > ships.size) {
+				ships.add(null)
 			}
+			ships.add(ship)
+		} else {
+			ships[id] = ship
 		}
 		ship.setPlayerColor(id)
 	}
 
 	fun removeShip(id: Int) {
-		synchronized(ships) { ships.set(id, null) }
+		ships[id] = null
 	}
 
 	fun clearShips() {
-		synchronized(ships) { ships.clear() }
+		ships.clear()
 		localShip.setPlayerColor(0)
 	}
 

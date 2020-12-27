@@ -1,4 +1,4 @@
-/*
+package main.java/*
  * Copyright 2013 Mark Injerd
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -14,6 +14,7 @@
  * limitations under the License.
  */
 
+import GameView
 import java.io.IOException
 import javax.swing.ImageIcon
 import javax.swing.JFrame
@@ -31,7 +32,7 @@ class Main private constructor() : JFrame("Comet Busters") {
 
 	init {
 		defaultCloseOperation = EXIT_ON_CLOSE
-		iconImage = ImageIcon(javaClass.getResource("icon.png")).image
+		iconImage = ImageIcon(javaClass.getResource("/img/icon.png")).image
 		try {
 			val gv = GameView()
 			jMenuBar = gv.createMenu()

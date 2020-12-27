@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="en">
+	<head>
+		<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+		<title>Comet Busters!</title>
+		<style>
+			.navbar {
+				width: 1024px;
+				display: flex;
+				background-color: #f0f0f0;
+				font-family: Helvetica;
+			}
+
+			button {
+				padding: 4px 16px;
+				border-style: solid;
+				border-width: thin;
+				border-color: #a0a0a0;
+			}
+
+			#btn4 {
+				margin-right: 4px;
+			}
+
+			.dropdown-content {
+				display: none;
+				position: absolute;
+				background-color: #f0f0f0;
+				border-style: solid;
+				border-width: thin;
+				border-color: #a0a0a0;
+			}
+
+			.dropdown-content a {
+				display: block;
+				padding: 8px 16px;
+				font-size: 14px;
+				color: black;
+				text-decoration: none;
+				cursor: default;
+			}
+
+			.show {
+				display: block;
+			}
+		</style>
+		<script type="text/javascript" src="https://www.midijs.net/lib/midi.js"></script>
+	</head>
+	<body>
+		<div class="navbar">
+			<button id="btn1" accesskey="1" disabled><u>1</u></button>
+			<button id="btn2" accesskey="2" disabled><u>2</u></button>
+			<button id="btn3" accesskey="3" disabled><u>3</u></button>
+			<button id="btn4" accesskey="4" disabled><u>4</u></button>
+			<button id="btnStart" accesskey="T">S<u>t</u>art</button>
+			<button id="btnPlayers" accesskey="L" disabled>P<u>l</u>ayers</button>
+			<div class="dropdown-button">
+				<button id="btnGame" accesskey="G" disabled><u>G</u>ame</button>
+				<div id="gameDropdown" class="dropdown-content">
+					<a href="#" id="gameHost">Host</a>
+					<a href="#" id="gameConnect">Connect</a>
+					<a href="#" id="gameDisconnect" style="display: none;">Disconnect</a>
+				</div>
+			</div>
+			<button id="btnPause" accesskey="P"><u>P</u>ause</button>
+			<button id="btnSound" accesskey="S"><u>S</u>ound</button>
+			<button id="btnMusic" accesskey="M"><u>M</u>usic</button>
+			<button id="btnHelp" accesskey="H" disabled><u>H</u>elp</button>
+			<button id="btnAbout" accesskey="A" disabled><u>A</u>bout</button>
+		</div>
+		<script src="js-app.js"></script>
+	</body>
+</html>

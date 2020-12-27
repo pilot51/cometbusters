@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-import java.util.*
+import Platform.Utils.Timer
 
 object LevelManager {
 	/** Milliseconds to wait before new level begins. */
@@ -30,7 +30,8 @@ object LevelManager {
 		private set
 
 	/** Indicates whether the new level or game over text should be shown. */
-	private var shouldShowText = false
+	var shouldShowText = false
+		private set
 
 	/** Starts a new game at level 1. */
 	fun startGame() {
@@ -39,10 +40,9 @@ object LevelManager {
 			ShipManager.localShip.reset(true)
 		} else {
 			startLevel(1)
-			for (ship in ShipManager.ships) {
-				if (ship == null) continue
-				ship.reset(true)
-				ship.spawn()
+			ShipManager.ships.filterNotNull().forEach {
+				it.reset(true)
+				it.spawn()
 			}
 		}
 		Audio.MUSIC_GAME.loop()
@@ -51,17 +51,11 @@ object LevelManager {
 	/** Stops the game by terminating the ship(s), stopping music if playing, and generating background asteroids. */
 	fun stopGame() {
 		Simulation.isStarted = false
-		for (ship in ShipManager.ships) {
-			if (ship == null) continue
-			ship.terminate()
+		ShipManager.ships.filterNotNull().forEach {
+			it.terminate()
 		}
 		createBackgroundAsteroids()
 		Audio.MUSIC_GAME.stop()
-	}
-
-	/** @return True if the new level or game over text should be shown. */
-	fun shouldShowText(): Boolean {
-		return shouldShowText
 	}
 
 	/** @return True if we're in the wait period at the beginning of a level prior to generating asteroids. */
@@ -80,25 +74,23 @@ object LevelManager {
 		LevelManager.level = level
 		shouldShowText = true
 		if (level == 1) {
-			synchronized(Asteroid.asteroids) { Asteroid.asteroids.clear() }
+			Asteroid.asteroids.clear()
 		}
 		MultiplayerManager.instance.sendLevel()
 		Asteroid.setLevelImages(level)
 		val startTime = Simulation.simulationTime
-		Timer().schedule(object : TimerTask() {
-			override fun run() {
-				if (!Simulation.isStarted || !Asteroid.asteroids.isEmpty()) {
-					cancel()
-					shouldShowText = false
-				} else if (Simulation.simulationTime - startTime >= NEW_LEVEL_WAIT) {
-					if (!MultiplayerManager.instance.isClient) {
-						Asteroid.generateAsteroids()
-					}
-					cancel()
-					shouldShowText = false
+		Timer().run(Simulation.TICK_RATE.toLong(), (1000 / Simulation.TICK_RATE).toLong()) {
+			if (!Simulation.isStarted || Asteroid.asteroids.isNotEmpty()) {
+				it.cancel()
+				shouldShowText = false
+			} else if (Simulation.simulationTime - startTime >= NEW_LEVEL_WAIT) {
+				if (!MultiplayerManager.instance.isClient) {
+					Asteroid.generateAsteroids()
 				}
+				it.cancel()
+				shouldShowText = false
 			}
-		}, Simulation.TICK_RATE.toLong(), (1000 / Simulation.TICK_RATE).toLong())
+		}
 	}
 
 	/** Starts the next level. */
@@ -120,20 +112,18 @@ object LevelManager {
 			Audio.MUSIC_DEATH.play()
 		}
 		val deathTime = Simulation.simulationTime
-		Timer().schedule(object : TimerTask() {
-			override fun run() {
-				val timeSinceDeath = Simulation.simulationTime - deathTime
-				if (timeSinceDeath >= BEFORE_GAMEOVER_WAIT + GAMEOVER_WAIT) {
-					cancel()
-					shouldShowText = false
-				} else if (timeSinceDeath >= BEFORE_GAMEOVER_WAIT) {
-					shouldShowText = true
-					Simulation.isStarted = false
-				} else if (!Simulation.isStarted) {
-					cancel()
-				}
+		Timer().run(Simulation.TICK_RATE.toLong(), (1000 / Simulation.TICK_RATE).toLong()) {
+			val timeSinceDeath = Simulation.simulationTime - deathTime
+			if (timeSinceDeath >= BEFORE_GAMEOVER_WAIT + GAMEOVER_WAIT) {
+				it.cancel()
+				shouldShowText = false
+			} else if (timeSinceDeath >= BEFORE_GAMEOVER_WAIT) {
+				shouldShowText = true
+				Simulation.isStarted = false
+			} else if (!Simulation.isStarted) {
+				it.cancel()
 			}
-		}, Simulation.TICK_RATE.toLong(), (1000 / Simulation.TICK_RATE).toLong())
+		}
 	}
 
 	/** Generates level 1 asteroids to be shown in the background outside of gameplay. */

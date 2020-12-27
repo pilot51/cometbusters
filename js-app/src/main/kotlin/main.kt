@@ -1,5 +1,5 @@
 /*
- * Copyright 2015 Mark Injerd
+ * Copyright 2020 Mark Injerd
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -14,26 +14,6 @@
  * limitations under the License.
  */
 
-import java.io.IOException
-import javax.swing.JApplet
-import kotlin.system.exitProcess
-
-class Applet : JApplet() {
-	override fun init() {
-		try {
-			val gv = GameView()
-			jMenuBar = gv.createMenu()
-			add(gv)
-			isVisible = true
-			setSize(1024, 768)
-		} catch (e: IOException) {
-			System.err.println("Error loading images!")
-			e.printStackTrace()
-			exitProcess(1)
-		}
-	}
-
-	companion object {
-		private const val serialVersionUID = 1L
-	}
+fun main() {
+	GameView()
 }

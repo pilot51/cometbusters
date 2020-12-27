@@ -14,25 +14,24 @@
  * limitations under the License.
  */
 
-import java.awt.Color
-import java.awt.Graphics2D
-import java.awt.Image
-import java.awt.geom.AffineTransform
-import java.awt.image.BufferedImage
-import java.io.IOException
-import java.util.*
-import javax.imageio.ImageIO
+import Platform.Renderer.RenderView2D
+import Platform.Renderer.Transform2D
+import Platform.Resources
+import Platform.Resources.Image
+import Platform.Resources.MutableImage
+import Platform.Utils.Math
+import Platform.Utils.Timer
 import kotlin.math.abs
 import kotlin.math.cos
 import kotlin.math.sin
 
 /** Creates a new ship, initially not spawned. Call [spawn] to spawn the ship. */
 class Ship internal constructor() : Entity(0f, 0f, 0, 0, THRUST, ROTATE_SPEED) {
-	private var image: BufferedImage? = null
-	private var imageSpawning: BufferedImage? = null
+	private var image: MutableImage = RenderUtils.getPlayerShipImage(0)
+	private var imageSpawning: MutableImage? = null
 	private lateinit var thrustImages: Array<Image>
 	private var thrustRadius: Int = 0
-	private val trans = AffineTransform()
+	private val trans = Transform2D()
 
 	/**
 	 * Gets a list of live bullets fired by this ship, after removing expired bullets.
@@ -50,13 +49,14 @@ class Ship internal constructor() : Entity(0f, 0f, 0, 0, THRUST, ROTATE_SPEED) {
 
 	init {
 		super.destroy()
-		setPlayerColor(0)
-		radius = image!!.getWidth(null) / 2
+		radius = image.width / 2
 		try {
-			thrustImages = arrayOf(ImageIO.read(javaClass.getResource("thrust1.png")),
-					ImageIO.read(javaClass.getResource("thrust2.png")))
-			thrustRadius = thrustImages[0].getWidth(null) / 2
-		} catch (e: IOException) {
+			thrustImages = arrayOf(
+				Image("img/thrust1.png"),
+				Image("img/thrust2.png")
+			)
+			thrustRadius = thrustImages[0].width / 2
+		} catch (e: Exception) {
 			e.printStackTrace()
 		}
 	}
@@ -77,20 +77,20 @@ class Ship internal constructor() : Entity(0f, 0f, 0, 0, THRUST, ROTATE_SPEED) {
 		image = RenderUtils.getPlayerShipImage(playerId)
 	}
 
-	fun drawShip(g2d: Graphics2D) {
+	fun drawShip(view2D: RenderView2D) {
 		if (isDestroyed) return
 		aliveTime = Simulation.simulationTime - birthTime
 		if (isAccelerating && !isSpawning) {
-			g2d.drawImage(thrustImage, thrustTransform, null)
+			view2D.drawImage(thrustImage, thrustTransform)
 		}
 		if (isSpawning) {
 			if (imageSpawning == null) {
-				imageSpawning = RenderUtils.convertImageToSingleColorWithAlpha(image, Color.WHITE)
+				imageSpawning = RenderUtils.convertImageToSingleColorWithAlpha(image, Resources.Color.WHITE)
 			}
 		} else {
 			imageSpawning = null
 		}
-		g2d.drawImage(if (imageSpawning != null) imageSpawning else image, transform, null)
+		view2D.drawImage((imageSpawning ?: image), transform)
 	}
 
 	private var thrustFrame = 0
@@ -101,7 +101,7 @@ class Ship internal constructor() : Entity(0f, 0f, 0, 0, THRUST, ROTATE_SPEED) {
 			}
 			return thrustImages[thrustFrame]
 		}
-	private val transform: AffineTransform
+	private val transform: Transform2D
 		get() {
 			var scale = 1.0
 			var scaledRadius = radius.toDouble()
@@ -116,7 +116,7 @@ class Ship internal constructor() : Entity(0f, 0f, 0, 0, THRUST, ROTATE_SPEED) {
 			}
 			return trans
 		}
-	private val thrustTransform: AffineTransform
+	private val thrustTransform: Transform2D
 		get() {
 			trans.setToTranslation((pos.x - (thrustRadius - 1)).toDouble(), (pos.y + radius / 2).toDouble())
 			trans.rotate(Math.toRadians(rotateDeg.toDouble()), (thrustRadius - 1).toDouble(), (-radius / 2).toDouble())
@@ -144,8 +144,8 @@ class Ship internal constructor() : Entity(0f, 0f, 0, 0, THRUST, ROTATE_SPEED) {
 			Audio.SHOOT.play()
 			val bulletX = (pos.x + sin(Math.toRadians(rotateDeg.toDouble())) * (radius - Bullet.bulletRadius)).toFloat()
 			val bulletY = (pos.y - cos(Math.toRadians(rotateDeg.toDouble())) * (radius - Bullet.bulletRadius)).toFloat()
-			val bullet = Bullet(ShipManager.getPlayerId(this), bulletX, bulletY, rotateDeg)
-			synchronized(bullets) { bullets.add(bullet) }
+			val bullet = Bullet(ShipManager.getPlayerId(this@Ship), bulletX, bulletY, rotateDeg)
+			bullets.add(bullet)
 			MultiplayerManager.instance.sendFiredBullet(bullet)
 		}
 	}
@@ -153,14 +153,12 @@ class Ship internal constructor() : Entity(0f, 0f, 0, 0, THRUST, ROTATE_SPEED) {
 	/** @return True if it is relatively safe to respawn, false if an asteroid is too close to the spawn point. */
 	private val isSafeHaven: Boolean
 		get() {
-			synchronized(Asteroid.asteroids) {
-				for (a in Asteroid.asteroids) {
-					if (abs(pos.x - a.pos.x) + abs(pos.y - a.pos.y) < radius + a.radius + 100) {
-						return false
-					}
+			Asteroid.asteroids.forEach {
+				if (abs(pos.x - it.pos.x) + abs(pos.y - it.pos.y) < radius + it.radius + 100) {
+					return false
 				}
-				return true
 			}
+			return true
 		}
 
 	/** Spawns this ship at the coordinates defined for the player id, motionless and pointed up. */
@@ -174,9 +172,7 @@ class Ship internal constructor() : Entity(0f, 0f, 0, 0, THRUST, ROTATE_SPEED) {
 	val isSpawning: Boolean
 		get() = aliveTime < MATERIALIZE_TIME
 
-	fun spawnProgress(): Double {
-		return aliveTime.toDouble() / MATERIALIZE_TIME
-	}
+	fun spawnProgress() = aliveTime.toDouble() / MATERIALIZE_TIME
 
 	/** Removes this ship from the field. */
 	fun terminate() {
@@ -192,25 +188,16 @@ class Ship internal constructor() : Entity(0f, 0f, 0, 0, THRUST, ROTATE_SPEED) {
 		if (lives > 0) {
 			reset(false)
 			val deathTime = Simulation.simulationTime
-			Timer().schedule(object : TimerTask() {
-				override fun run() {
-					if (!isDestroyed || !Simulation.isStarted) {
-						cancel()
-					} else if (Simulation.simulationTime - deathTime >= RESPAWN_DELAY && isSafeHaven) {
-						spawn()
-						cancel()
-					}
-				}
-			}, Simulation.TICK_RATE.toLong(), (1000 / Simulation.TICK_RATE).toLong())
-		} else {
-			var gameOver = true
-			for (ship in ShipManager.ships) {
-				if (ship == null) continue
-				if (!ship.isDestroyed || ship.lives > 0) {
-					gameOver = false
-					break
+			Timer().run(Simulation.TICK_RATE.toLong(), (1000 / Simulation.TICK_RATE).toLong()) {
+				if (!isDestroyed || !Simulation.isStarted) {
+					it.cancel()
+				} else if (Simulation.simulationTime - deathTime >= RESPAWN_DELAY && isSafeHaven) {
+					spawn()
+					it.cancel()
 				}
 			}
+		} else {
+			val gameOver = ShipManager.ships.filterNotNull().all { it.isDestroyed && it.lives == 0 }
 			if (gameOver) {
 				LevelManager.gameOver()
 			}

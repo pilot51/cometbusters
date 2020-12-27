@@ -16,25 +16,17 @@
 
 import Asteroid.Size
 import Simulation.GameStateListener
-import java.io.BufferedReader
-import java.io.IOException
-import java.io.InputStreamReader
-import java.io.PrintWriter
-import java.lang.Runnable
-import java.net.InetAddress
-import java.net.ServerSocket
-import java.net.Socket
-import java.net.UnknownHostException
-import java.util.*
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlin.math.max
+import kotlin.math.min
 
 class MultiplayerManager private constructor() {
-	private val connections: MutableList<Connection> = ArrayList()
-	private var serverSocket: ServerSocket? = null
+	val connections: MutableList<PlayerConnection> = ArrayList()
 	var isConnected = false
-		private set
 	var isClient = false
-		private set
-	private var connectionListener: ConnectionStateListener? = null
+	lateinit var connectionListener: ConnectionStateListener
 	private val gameStateListener: GameStateListener = object : GameStateListener {
 		override fun onGameStartStateChanged(started: Boolean) {
 			sendGameData()
@@ -55,14 +47,14 @@ class MultiplayerManager private constructor() {
 		Simulation.addGameStateListener(gameStateListener)
 	}
 
-	fun setConnectionStateListener(listener: ConnectionStateListener?) {
+	fun setConnectionStateListener(listener: ConnectionStateListener) {
 		connectionListener = listener
 	}
 
-	private fun startListening(conn: Connection) {
-		Thread {
+	fun startListening(conn: PlayerConnection) {
+		CoroutineScope(Dispatchers.Default).launch {
 			while (connections.contains(conn)) {
-				val msg = receive(conn)
+				val msg = Platform.Network.ConnectionManager.instance.receive(conn)
 				if (msg != null) {
 					val data = msg.split(" ").toTypedArray()
 					when (data[MESSAGE_TYPE].toInt()) {
@@ -75,11 +67,15 @@ class MultiplayerManager private constructor() {
 								asteroids = ArrayList()
 								var i = 0
 								while (i * ASTEROIDS_DATA_SIZE + ASTEROID_POSX < data.size) {
-									asteroids.add(Asteroid(data[i * ASTEROIDS_DATA_SIZE + ASTEROID_POSX].toFloat(),
-										data[i * ASTEROIDS_DATA_SIZE + ASTEROID_POSY].toFloat(),
-										data[i * ASTEROIDS_DATA_SIZE + ASTEROID_DIR].toInt(),
-										data[i * ASTEROIDS_DATA_SIZE + ASTEROID_VEL].toInt(),
-										Size.valueOf(data[i * ASTEROIDS_DATA_SIZE + ASTEROID_SIZE])))
+									asteroids.add(
+										Asteroid(
+											data[i * ASTEROIDS_DATA_SIZE + ASTEROID_POSX].toFloat(),
+											data[i * ASTEROIDS_DATA_SIZE + ASTEROID_POSY].toFloat(),
+											data[i * ASTEROIDS_DATA_SIZE + ASTEROID_DIR].toInt(),
+											data[i * ASTEROIDS_DATA_SIZE + ASTEROID_VEL].toInt(),
+											Size.valueOf(data[i * ASTEROIDS_DATA_SIZE + ASTEROID_SIZE])
+										)
+									)
 									i++
 								}
 							}
@@ -94,10 +90,14 @@ class MultiplayerManager private constructor() {
 								bullets = ArrayList()
 								var i = 0
 								while (i * SHIP_BULLET_DATA_SIZE + SHIP_BULLET_POSX < data.size) {
-									bullets.add(Bullet(data[PLAYER_ID].toInt(),
-										data[i * SHIP_BULLET_DATA_SIZE + SHIP_BULLET_POSX].toFloat(),
-										data[i * SHIP_BULLET_DATA_SIZE + SHIP_BULLET_POSY].toFloat(),
-										data[i * SHIP_BULLET_DATA_SIZE + SHIP_BULLET_DIR].toInt()))
+									bullets.add(
+										Bullet(
+											data[PLAYER_ID].toInt(),
+											data[i * SHIP_BULLET_DATA_SIZE + SHIP_BULLET_POSX].toFloat(),
+											data[i * SHIP_BULLET_DATA_SIZE + SHIP_BULLET_POSY].toFloat(),
+											data[i * SHIP_BULLET_DATA_SIZE + SHIP_BULLET_DIR].toInt()
+										)
+									)
 									i++
 								}
 							}
@@ -106,80 +106,37 @@ class MultiplayerManager private constructor() {
 								data[ACCEL].toBoolean(), data[DESTROYED].toBoolean(), data[SCORE].toInt(),
 								data[LIVES].toInt(), bullets)
 						}
-						MESSAGE_TYPE_BULLET -> onReceiveFiredBulletData(conn, Bullet(data[PLAYER_ID].toInt(),
-							data[POSX].toFloat(), data[POSY].toFloat(), data[DIRECTION].toInt()))
+						MESSAGE_TYPE_BULLET -> onReceiveFiredBulletData(conn.remoteShip!!, Bullet(
+							data[PLAYER_ID].toInt(),
+							data[POSX].toFloat(), data[POSY].toFloat(), data[DIRECTION].toInt()
+						))
 					}
 				} else {
 					disconnect(conn)
 					break
 				}
 			}
-		}.start()
+		}
 	}
 
 	fun startHost() {
-		Thread(Runnable {
-			println("Starting host on port $PORT")
-			serverSocket = try {
-				ServerSocket(PORT)
-			} catch (e: IOException) {
-				println("Could not listen on port $PORT")
-				return@Runnable
-			}
-			connectionListener!!.onHostWaiting()
-			while (serverSocket != null) {
-				try {
-					val conn = Connection(serverSocket!!.accept())
-					connections.add(conn)
-					isClient = false
-					onConnected(conn)
-					startListening(conn)
-				} catch (e: IOException) {
-					if (serverSocket != null) {
-						println("Connection failed!")
-						e.printStackTrace()
-					}
-				}
-				if (connections.size == 3) {
-					println("Connections full - waiting for a connection to drop before listening for new connections.")
-					synchronized(connections) {
-						try {
-							(connections as java.lang.Object).wait()
-						} catch (e: InterruptedException) {
-							e.printStackTrace()
-						}
-					}
-					println("Connection dropped - resume listening for new connections.")
-				}
-			}
-		}).start()
+		println("Starting host on port $PORT")
+		Platform.Network.ConnectionManager.instance.startHost()
 	}
 
 	fun connect(address: String?) {
-		if (address == null || address.isEmpty()) {
-			return
-		}
+		if (address.isNullOrBlank()) return
 		println("Connecting to server: $address:$PORT")
-		Thread {
-			try {
-				val conn = Connection(address)
-				connections.add(conn)
-				isClient = true
-				onConnected(conn)
-				startListening(conn)
-			} catch (e: UnknownHostException) {
-				println("Unknown host: $address")
-			} catch (e: IOException) {
-				println("Connection failed!")
-				e.printStackTrace()
-			}
-		}.start()
+		isClient = true
+		Platform.Network.ConnectionManager.instance.connect(address)
 	}
 
 	/** Disconnects all connections. */
 	fun disconnect() {
-		for (i in connections.indices.reversed()) {
-			disconnect(connections[i])
+		if (connections.isEmpty()) {
+			endMultiplayerSession()
+		} else {
+			connections.reversed().forEach { disconnect(it) }
 		}
 	}
 
@@ -187,30 +144,10 @@ class MultiplayerManager private constructor() {
 	 * Disconnects one connection.
 	 * @param conn The connection to disconnect.
 	 */
-	private fun disconnect(conn: Connection) {
+	private fun disconnect(conn: PlayerConnection) {
 		if (!connections.remove(conn)) return
-		synchronized(connections) {
-			(connections as java.lang.Object).notify()
-		}
-		Thread {
-			try {
-				conn.clientSocket.close()
-			} catch (e: IOException) {
-				e.printStackTrace()
-			}
-			println("Disconnected from ${conn.ipRemote.hostAddress}:$PORT" +
-				" (playerId ${ShipManager.getPlayerId(conn.remoteShip)})")
-			if (connections.isEmpty() && serverSocket != null) {
-				try {
-					serverSocket!!.close()
-					serverSocket = null
-					println("Stopped host")
-				} catch (e: IOException) {
-					e.printStackTrace()
-				}
-			}
-			onDisconnected(conn)
-		}.start()
+		Platform.Network.ConnectionManager.instance.disconnect(conn)
+		onDisconnected(conn)
 	}
 
 	private fun sendGameData() {
@@ -235,15 +172,12 @@ class MultiplayerManager private constructor() {
 		if (connections.isEmpty() || isClient) return
 		val data = arrayOfNulls<String>(1 + 5 * Asteroid.asteroids.size)
 		data[MESSAGE_TYPE] = MESSAGE_TYPE_ASTEROIDS.toString()
-		synchronized(Asteroid.asteroids) {
-			for (i in Asteroid.asteroids.indices) {
-				val a: Asteroid = Asteroid.asteroids.get(i)
-				data[i * ASTEROIDS_DATA_SIZE + ASTEROID_POSX] = a.pos.x.toString()
-				data[i * ASTEROIDS_DATA_SIZE + ASTEROID_POSY] = a.pos.y.toString()
-				data[i * ASTEROIDS_DATA_SIZE + ASTEROID_DIR] = a.direction.toString()
-				data[i * ASTEROIDS_DATA_SIZE + ASTEROID_VEL] = a.velocity.toString()
-				data[i * ASTEROIDS_DATA_SIZE + ASTEROID_SIZE] = a.size.name
-			}
+		Asteroid.asteroids.forEachIndexed { i, a ->
+			data[i * ASTEROIDS_DATA_SIZE + ASTEROID_POSX] = a.pos.x.toString()
+			data[i * ASTEROIDS_DATA_SIZE + ASTEROID_POSY] = a.pos.y.toString()
+			data[i * ASTEROIDS_DATA_SIZE + ASTEROID_DIR] = a.direction.toString()
+			data[i * ASTEROIDS_DATA_SIZE + ASTEROID_VEL] = a.velocity.toString()
+			data[i * ASTEROIDS_DATA_SIZE + ASTEROID_SIZE] = a.size.name
 		}
 		send(data)
 	}
@@ -254,24 +188,22 @@ class MultiplayerManager private constructor() {
 	 */
 	private fun sendShipData(ship: Ship) {
 		if (connections.isEmpty()) return
-		synchronized(ship.bullets) {
-			val data = arrayOfNulls<String>(9 + 3 * ship.bullets.size)
-			data[MESSAGE_TYPE] = MESSAGE_TYPE_PLAYER.toString()
-			data[PLAYER_ID] = ShipManager.ships.indexOf(ship).toString()
-			data[POSX] = ship.pos.x.toString()
-			data[POSY] = ship.pos.y.toString()
-			data[DIRECTION] = ship.rotateDeg.toString()
-			data[ACCEL] = ship.isAccelerating.toString()
-			data[DESTROYED] = ship.isDestroyed.toString()
-			data[SCORE] = ship.score.toString()
-			data[LIVES] = ship.lives.toString()
-			for ((i, b) in ship.bullets.withIndex()) {
-				data[i * SHIP_BULLET_DATA_SIZE + SHIP_BULLET_POSX] = b.pos.x.toString()
-				data[i * SHIP_BULLET_DATA_SIZE + SHIP_BULLET_POSY] = b.pos.y.toString()
-				data[i * SHIP_BULLET_DATA_SIZE + SHIP_BULLET_DIR] = b.direction.toString()
-			}
-			send(data)
+		val data = arrayOfNulls<String>(9 + 3 * ship.bullets.size)
+		data[MESSAGE_TYPE] = MESSAGE_TYPE_PLAYER.toString()
+		data[PLAYER_ID] = ShipManager.ships.indexOf(ship).toString()
+		data[POSX] = ship.pos.x.toString()
+		data[POSY] = ship.pos.y.toString()
+		data[DIRECTION] = ship.rotateDeg.toString()
+		data[ACCEL] = ship.isAccelerating.toString()
+		data[DESTROYED] = ship.isDestroyed.toString()
+		data[SCORE] = ship.score.toString()
+		data[LIVES] = ship.lives.toString()
+		ship.bullets.toList().forEachIndexed { i, b ->
+			data[i * SHIP_BULLET_DATA_SIZE + SHIP_BULLET_POSX] = b.pos.x.toString()
+			data[i * SHIP_BULLET_DATA_SIZE + SHIP_BULLET_POSY] = b.pos.y.toString()
+			data[i * SHIP_BULLET_DATA_SIZE + SHIP_BULLET_DIR] = b.direction.toString()
 		}
+		send(data)
 	}
 
 	/**
@@ -285,24 +217,21 @@ class MultiplayerManager private constructor() {
 		data[MESSAGE_TYPE] = MESSAGE_TYPE_PLAYER.toString()
 		data[PLAYER_ID] = playerId.toString()
 		data[PLAYER_IS_CONNECTED] = connected.toString()
-		for (conn in connections) {
-			if (playerId != ShipManager.getPlayerId(conn.remoteShip)) {
-				send(conn, data)
-			}
-		}
+		connections.filterNot {
+			it.playerId == playerId
+		}.forEach { conn -> send(conn, data) }
 	}
 
 	/**
 	 * Sends the connection status of all connected players (minus the target player) to one client.
 	 * @param conn The connection to receive the connection data.
 	 */
-	private fun sendConnectedPlayers(conn: Connection) {
+	private fun sendConnectedPlayers(conn: PlayerConnection) {
 		if (connections.isEmpty() || isClient) return
-		for (otherConn in connections) {
-			if (otherConn === conn) continue
+		connections.filterNot { it === conn }.forEach { otherConn ->
 			val data = arrayOfNulls<String>(3)
 			data[MESSAGE_TYPE] = MESSAGE_TYPE_PLAYER.toString()
-			data[PLAYER_ID] = ShipManager.getPlayerId(otherConn.remoteShip).toString()
+			data[PLAYER_ID] = otherConn.playerId!!.toString()
 			data[PLAYER_IS_CONNECTED] = true.toString()
 			send(conn, data)
 		}
@@ -313,16 +242,12 @@ class MultiplayerManager private constructor() {
 	 * Server: Sends data for all ships.
 	 */
 	fun sendShipUpdate() {
-		if (connections.isEmpty()) return
+		if (!Simulation.isStarted || connections.isEmpty()) return
 		if (isClient && !ShipManager.localShip.isDestroyed) {
 			sendShipData(ShipManager.localShip)
 		} else {
-			val ships = ShipManager.ships
-			synchronized(ships) {
-				for (s in ships) {
-					if (s == null) continue
-					sendShipData(s)
-				}
+			ShipManager.ships.filterNotNull().forEach {
+				sendShipData(it)
 			}
 		}
 	}
@@ -340,8 +265,8 @@ class MultiplayerManager private constructor() {
 		data[POSX] = bullet.pos.x.toString()
 		data[POSY] = bullet.pos.y.toString()
 		data[DIRECTION] = bullet.direction.toString()
-		for (conn in connections) {
-			if (bullet.playerId != ShipManager.getPlayerId(conn.remoteShip)) {
+		connections.forEach { conn ->
+			if (bullet.playerId != conn.playerId) {
 				send(conn, data)
 			}
 		}
@@ -352,8 +277,8 @@ class MultiplayerManager private constructor() {
 	 * @param data The data to be sent.
 	 */
 	private fun send(data: Array<String?>) {
-		for (conn in connections) {
-			conn.out.println(data.joinToString(" "))
+		connections.filterNot { it.playerId == null }.forEach {
+			Platform.Network.ConnectionManager.instance.send(it, data.joinToString(" "))
 		}
 	}
 
@@ -362,37 +287,26 @@ class MultiplayerManager private constructor() {
 	 * @param conn The connection to send the data to.
 	 * @param data The data to be sent.
 	 */
-	private fun send(conn: Connection, data: Array<String?>) {
-		conn.out.println(data.joinToString(" "))
-	}
-
-	/**
-	 * Receives data from a connection.
-	 * @param conn The connection to receive the data from.
-	 */
-	private fun receive(conn: Connection): String? {
-		var msg: String? = null
-		try {
-			msg = conn.`in`.readLine()
-		} catch (e: IOException) {
-			e.printStackTrace()
+	private fun send(conn: PlayerConnection, data: Array<String?>) {
+		connections.filterNot { it.playerId == null }.forEach {
+			Platform.Network.ConnectionManager.instance.send(conn, data.joinToString(" "))
 		}
-		return msg
 	}
 
 	/**
 	 * Called when a connection has been established to do some game setup for the new player.
 	 * @param conn The new connection.
 	 */
-	private fun onConnected(conn: Connection) {
+	fun onConnected(conn: PlayerConnection) {
 		println("Connected!")
 		isConnected = true
-		connectionListener!!.onConnected()
+		connectionListener.onConnected()
+		connections.add(conn)
 		if (isClient) {
 			conn.remoteShip = Ship().also {
 				ShipManager.addShip(it, 0)
 			}
-			val localPlayerId = receive(conn)!!.toInt()
+			val localPlayerId = Platform.Network.ConnectionManager.instance.receive(conn)!!.toInt()
 			println("Local player ID: $localPlayerId")
 			ShipManager.addShip(ShipManager.localShip, localPlayerId)
 		} else {
@@ -400,7 +314,9 @@ class MultiplayerManager private constructor() {
 			if (remotePlayerId == -1) {
 				remotePlayerId = ShipManager.ships.size
 			}
-			conn.out.println(remotePlayerId)
+			println("Remote client playerId: $remotePlayerId")
+			Platform.Network.ConnectionManager.instance.send(conn, remotePlayerId)
+			conn.playerId = remotePlayerId
 			sendGameData()
 			sendAsteroids()
 			ShipManager.addShip(ShipManager.localShip, 0)
@@ -408,27 +324,33 @@ class MultiplayerManager private constructor() {
 				if (Simulation.isStarted) it.lives = 0
 				ShipManager.addShip(it, remotePlayerId)
 			}
-			println("Remote client playerId: $remotePlayerId")
 			sendConnectedPlayers(conn)
-			sendPlayerConnectionStatus(ShipManager.getPlayerId(conn.remoteShip), true)
+			sendPlayerConnectionStatus(remotePlayerId, true)
 		}
+		startListening(conn)
 	}
 
 	/**
 	 * Called when a connection has been dropped.
 	 * @param conn The dropped connection.
 	 */
-	private fun onDisconnected(conn: Connection) {
-		val playerId = ShipManager.getPlayerId(conn.remoteShip)
+	fun onDisconnected(conn: PlayerConnection) {
+		val playerId = conn.playerId!!
+		println("Disconnected from ${conn.remoteAddress}:${conn.remotePort} (playerId ${playerId})")
 		sendPlayerConnectionStatus(playerId, false)
 		ShipManager.removeShip(playerId)
 		if (connections.isEmpty()) {
-			Simulation.isStarted = false
-			isConnected = false
-			isClient = false
-			connectionListener!!.onDisconnected()
-			ShipManager.clearShips()
+			endMultiplayerSession()
 		}
+	}
+
+	fun endMultiplayerSession() {
+		if (!isClient) Platform.Network.ConnectionManager.instance.stopHost()
+		Simulation.isStarted = false
+		isConnected = false
+		isClient = false
+		connectionListener.onDisconnected()
+		ShipManager.clearShips()
 	}
 
 	private fun onReceiveGameData(isStarted: Boolean, isPaused: Boolean) {
@@ -468,7 +390,7 @@ class MultiplayerManager private constructor() {
 	 * @param bullets List of active bullets that the player has shot.
 	 */
 	private fun onReceivePlayerData(
-		conn: Connection, playerId: Int, posX: Float, posY: Float, rotationDeg: Int, thrust: Boolean,
+		conn: PlayerConnection, playerId: Int, posX: Float, posY: Float, rotationDeg: Int, thrust: Boolean,
 		isDestroyed: Boolean, score: Int, lives: Int, bullets: List<Bullet>?
 	) {
 		val ships = ShipManager.ships
@@ -489,10 +411,8 @@ class MultiplayerManager private constructor() {
 			if (ship != ShipManager.localShip) {
 				ship.forceUpdate(posX, posY, rotationDeg, thrust)
 			}
-			synchronized(ship.bullets) {
-				ship.bullets.clear()
-				bullets?.let { ship.bullets.addAll(it) }
-			}
+			ship.bullets.clear()
+			bullets?.let { ship.bullets.addAll(it) }
 			if (isDestroyed && !ship.isDestroyed) {
 				ship.destroy()
 			} else if (!isDestroyed && ship.isDestroyed) {
@@ -507,11 +427,11 @@ class MultiplayerManager private constructor() {
 	 * @param conn The connection where the shot originated from, only used by host.
 	 * @param bullet The fired bullet.
 	 */
-	private fun onReceiveFiredBulletData(conn: Connection, bullet: Bullet) {
+	private fun onReceiveFiredBulletData(ship: Ship, bullet: Bullet) {
 		if (!isClient) {
 			sendFiredBullet(bullet)
-			conn.remoteShip!!.bullets.let {
-				synchronized(it) { it.add(bullet) }
+			ship.bullets.let {
+				it.add(bullet)
 			}
 		}
 		Audio.SHOOT.play()
@@ -523,54 +443,49 @@ class MultiplayerManager private constructor() {
 	 */
 	private fun onReceiveAsteroidData(updatedAsteroids: List<Asteroid>?) {
 		val asteroids = Asteroid.asteroids
-		synchronized(asteroids) {
-			if (updatedAsteroids == null) {
-				if (asteroids.size == 1 && asteroids[0].size == Size.SMALL) {
+		if (updatedAsteroids == null) {
+			if (asteroids.size == 1 && asteroids[0].size == Size.SMALL) {
+				Audio.EXPLODE_SMALL.play()
+			}
+			asteroids.clear()
+		} else {
+			for (i in min(asteroids.size, updatedAsteroids.size)
+				until max(asteroids.size, updatedAsteroids.size)) {
+				if (i >= asteroids.size) {
+					when (updatedAsteroids[i].size) {
+						Size.LARGE -> {
+						}
+						Size.MEDIUM -> Audio.EXPLODE_LARGE.play()
+						Size.SMALL -> Audio.EXPLODE_MEDIUM.play()
+					}
+				} else if (i >= updatedAsteroids.size) {
 					Audio.EXPLODE_SMALL.play()
 				}
-				asteroids.clear()
-			} else {
-				for (i in Math.min(asteroids.size, updatedAsteroids.size)
-						until Math.max(asteroids.size, updatedAsteroids.size)) {
-					if (i >= asteroids.size) {
-						when (updatedAsteroids[i].size) {
-							Size.LARGE -> {}
-							Size.MEDIUM -> Audio.EXPLODE_LARGE.play()
-							Size.SMALL -> Audio.EXPLODE_MEDIUM.play()
-						}
-					} else if (i >= updatedAsteroids.size) {
-						Audio.EXPLODE_SMALL.play()
-					}
-				}
-				asteroids.clear()
-				asteroids.addAll(updatedAsteroids)
 			}
+			asteroids.clear()
+			asteroids.addAll(updatedAsteroids)
 		}
 	}
 
-	private inner class Connection {
-		val clientSocket: Socket
-		val out: PrintWriter
-		val `in`: BufferedReader
-		val ipRemote: InetAddress
+	class PlayerConnection {
+		val localPort: Int
+		val remoteAddress: String
+		val remotePort: Int
+		var playerId: Int? = null
 		var remoteShip: Ship? = null
 
-		/** Host constructor */
-		constructor(clientSocket: Socket) {
-			this.clientSocket = clientSocket
-			out = PrintWriter(clientSocket.getOutputStream(), true)
-			`in` = BufferedReader(InputStreamReader(clientSocket.getInputStream()))
-			ipRemote = clientSocket.inetAddress
-			println("Incoming connection: ${ipRemote.hostAddress}:${clientSocket.port}")
-		}
-
-		/** Client constructor */
-		constructor(hostAddress: String) {
-			ipRemote = InetAddress.getByName(hostAddress)
-			clientSocket = Socket(ipRemote, PORT)
-			out = PrintWriter(clientSocket.getOutputStream(), true)
-			`in` = BufferedReader(InputStreamReader(clientSocket.getInputStream()))
-			println("Local client port: ${clientSocket.localPort}")
+		constructor(remoteAddress: String, remotePort: Int, localPort: Int) {
+			if (MultiplayerManager.instance.isClient) {
+				this.localPort = localPort
+				this.remoteAddress = remoteAddress
+				this.remotePort = remotePort
+				println("Local client port: ${localPort}")
+			} else {
+				this.localPort = localPort
+				this.remoteAddress = remoteAddress
+				this.remotePort = remotePort
+				println("Incoming connection: ${remoteAddress}:${remotePort}")
+			}
 		}
 	}
 
@@ -604,6 +519,6 @@ class MultiplayerManager private constructor() {
 		private const val SHIP_BULLET_POSX = 9
 		private const val SHIP_BULLET_POSY = 10
 		private const val SHIP_BULLET_DIR = 11
-		private const val PORT = 50001
+		const val PORT = 50001
 	}
 }

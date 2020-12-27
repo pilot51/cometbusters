@@ -14,81 +14,83 @@
  * limitations under the License.
  */
 
-import MultiplayerManager.ConnectionStateListener
-import Simulation.GameStateListener
-import java.awt.*
+import Platform.Renderer.RenderView2D
+import Platform.Renderer.TextLayout
+import Platform.Resources.Font
+import Platform.Resources.Image
+import Platform.Utils.Timer
+import Platform.Utils.toZeroPaddedString
+import java.awt.Dimension
+import java.awt.Graphics
 import java.awt.event.KeyEvent
 import java.awt.event.KeyListener
-import java.awt.font.TextLayout
 import java.io.IOException
 import java.util.*
-import java.util.Timer
-import javax.imageio.ImageIO
 import javax.swing.*
 
 /**
  * Creates the game view and objects required within it.
  * @throws IOException if any images could not be read.
  */
-class GameView @Throws(IOException::class) internal constructor() : JComponent(), KeyListener {
-	private val imgBg: Image
+actual class GameView @Throws(IOException::class) constructor() : JComponent(), KeyListener {
+	private val imgBg = Image("img/background.png")
 
 	init {
 		preferredSize = Dimension(VIEW_WIDTH, VIEW_HEIGHT)
-		imgBg = ImageIO.read(javaClass.getResource("background.png"))
 		Audio.init()
 		Bullet.init()
 		LevelManager.createBackgroundAsteroids()
 		addKeyListener(this)
 		isFocusable = true
-		Timer().schedule(object : TimerTask() {
-			override fun run() {
-				if (!Simulation.isPaused()) {
-					Simulation.simulate()
-					repaint()
-				}
+		Timer().run((1000 / Simulation.TICK_RATE).toLong(), (1000 / Simulation.TICK_RATE).toLong()) {
+			if (!Simulation.isPaused()) {
+				Simulation.simulate()
+				repaint()
 			}
-		}, (1000 / Simulation.TICK_RATE).toLong(), (1000 / Simulation.TICK_RATE).toLong())
+		}
 	}
 
 	override fun paintComponent(g: Graphics) {
 		super.paintComponent(g)
-		val g2d = g as Graphics2D
-		g2d.drawImage(imgBg, 0, 0, null)
-		g2d.font = Font("Arial", Font.PLAIN, 22)
+		val view2D = RenderView2D(g)
+		view2D.drawImage(imgBg, 0, 0)
+		view2D.setFont(Font(Font.ARIAL, Font.Style.PLAIN, 22))
 		val ships = ShipManager.ships
-		synchronized(ships) {
-			for ((i, ship) in ships.withIndex()) {
-				ship ?: continue
-				val x = if (i == 0 || i == 3) 30 else VIEW_WIDTH - 118
-				val y = if (i == 0 || i == 2) 30 else VIEW_HEIGHT - 42
-				g2d.color = RenderUtils.PLAYER_COLORS[i]
-				g2d.drawString(String.format("%07d", ship.score), x, y)
-				RenderUtils.drawLives(g2d, ship.lives, RenderUtils.PLAYER_COLORS[i], x, y + 14)
-			}
+		ships.filterNotNull().forEachIndexed { i, ship ->
+			val x = if (i == 0 || i == 3) 30 else VIEW_WIDTH - 118
+			val y = if (i == 0 || i == 2) 30 else VIEW_HEIGHT - 42
+			val color = RenderUtils.PLAYER_COLORS[i]
+			view2D.setColor(color)
+			view2D.drawText(ship.score.toZeroPaddedString(7), x, y)
+			RenderUtils.drawLives(view2D, ship.lives, color, x, y + 14)
 		}
-		Asteroid.drawAsteroids(g2d)
-		synchronized(ships) {
-			for (s in ships) {
-				if (s == null) continue
-				s.drawShip(g2d)
-				Bullet.drawBullets(g2d, s)
-			}
+		Asteroid.drawAsteroids(view2D)
+		ships.filterNotNull().forEach {
+			it.drawShip(view2D)
+			Bullet.drawBullets(view2D, it)
 		}
 		if (LevelManager.isWaitingToStartLevel) {
-			val font = Font(Font.SANS_SERIF, Font.BOLD, 100)
-			g2d.font = font
-			g2d.color = RenderUtils.TEXT_LEVEL_COLOR
+			val font = Font(Font.SANS_SERIF, Font.Style.BOLD, 100)
+			view2D.setFont(font)
+			view2D.setColor(RenderUtils.TEXT_LEVEL_COLOR)
 			val text = "LEVEL ${LevelManager.level}"
-			val textBounds = TextLayout(text, font, g2d.fontRenderContext).bounds
-			g2d.drawString(text, VIEW_WIDTH / 2 - textBounds.width.toInt() / 2, VIEW_HEIGHT / 4 + textBounds.height.toInt() / 2)
-		} else if (LevelManager.shouldShowText() && LevelManager.isGameOver) {
-			val font = Font(Font.SANS_SERIF, Font.BOLD, 100)
-			g2d.font = font
-			g2d.color = RenderUtils.TEXT_GAMEOVER_COLOR
+			val textBounds = TextLayout(text, font, view2D.fontRenderContext).bounds
+			view2D.drawText(
+				text,
+				VIEW_WIDTH / 2 - textBounds.width.toInt() / 2,
+				VIEW_HEIGHT / 4 + textBounds.height.toInt() / 2
+			)
+		} else if (LevelManager.shouldShowText && LevelManager.isGameOver) {
+			val font = Font(Font.SANS_SERIF, Font.Style.BOLD, 100)
+			view2D.setFont(font)
+			view2D.setColor(RenderUtils.TEXT_GAMEOVER_COLOR)
 			val text = "GAME OVER"
-			val textBounds = TextLayout(text, font, g2d.fontRenderContext).bounds
-			g2d.drawString(text, VIEW_WIDTH / 2 - textBounds.width.toInt() / 2, VIEW_HEIGHT / 2 + textBounds.height.toInt() / 2)
+			val textBounds = TextLayout(text, font, view2D.fontRenderContext).bounds
+			view2D.drawText(
+				text,
+				VIEW_WIDTH / 2 - textBounds.width.toInt() / 2,
+				VIEW_HEIGHT / 2 + textBounds.height.toInt() / 2
+			)
 		}
 		toolkit.sync()
 	}
@@ -167,9 +169,6 @@ class GameView @Throws(IOException::class) internal constructor() : JComponent()
 		buttonSound.addActionListener { buttonSound.text = if (Audio.toggleSound()) "Sound" else "(sound)" }
 		buttonMusic.addActionListener {
 			buttonMusic.text = if (Audio.toggleMusic()) "Music" else "(music)"
-			if (Simulation.isStarted) {
-				Audio.MUSIC_GAME.loop()
-			}
 		}
 		popupGame.add(menuHost)
 		popupGame.add(menuConnect)
@@ -187,7 +186,7 @@ class GameView @Throws(IOException::class) internal constructor() : JComponent()
 		menuBar.add(buttonMusic)
 		menuBar.add(buttonHelp)
 		menuBar.add(buttonAbout)
-		Simulation.addGameStateListener(object : GameStateListener {
+		Simulation.addGameStateListener(object : Simulation.GameStateListener {
 			override fun onGameStartStateChanged(started: Boolean) {
 				buttonStart.text = if (started) "Stop" else "Start"
 				if (MultiplayerManager.instance.isClient) {
@@ -208,7 +207,7 @@ class GameView @Throws(IOException::class) internal constructor() : JComponent()
 				}
 			}
 		})
-		MultiplayerManager.instance.setConnectionStateListener(object : ConnectionStateListener {
+		MultiplayerManager.instance.setConnectionStateListener(object : MultiplayerManager.ConnectionStateListener {
 			override fun onHostWaiting() {
 				menuHost.isVisible = false
 				menuConnect.isVisible = false
@@ -258,9 +257,9 @@ class GameView @Throws(IOException::class) internal constructor() : JComponent()
 
 	override fun keyTyped(e: KeyEvent) {}
 
-	companion object {
+	actual companion object {
 		private const val serialVersionUID = 1L
-		const val VIEW_WIDTH = 1024
-		const val VIEW_HEIGHT = 768
+		actual val VIEW_WIDTH = 1024
+		actual val VIEW_HEIGHT = 768
 	}
 }

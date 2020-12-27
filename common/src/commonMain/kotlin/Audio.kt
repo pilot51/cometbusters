@@ -14,21 +14,18 @@
  * limitations under the License.
  */
 
-import java.io.IOException
-import javax.sound.sampled.*
-
 enum class Audio(private val filename: String) {
-	MUSIC_GAME("comet.mid"),
-	MUSIC_DEATH("comet1.mid"),
-	MUSIC_HIGHSCORE("comet2.mid"),
-	THRUST("thrust.wav"),
-	SHOOT("shoot.wav"),
-	SPAWN("spawn.wav"),
-	EXPLODE_PLAYER("explode_player.wav"),
-	EXPLODE_LARGE("explode_large.wav"),
-	EXPLODE_MEDIUM("explode_medium.wav"),
-	EXPLODE_SMALL("explode_small.wav"),
-	EXTRA_LIFE("extra_life.wav");
+	MUSIC_GAME("snd/comet.mid"),
+	MUSIC_DEATH("snd/comet1.mid"),
+	MUSIC_HIGHSCORE("snd/comet2.mid"),
+	THRUST("snd/thrust.wav"),
+	SHOOT("snd/shoot.wav"),
+	SPAWN("snd/spawn.wav"),
+	EXPLODE_PLAYER("snd/explode_player.wav"),
+	EXPLODE_LARGE("snd/explode_large.wav"),
+	EXPLODE_MEDIUM("snd/explode_medium.wav"),
+	EXPLODE_SMALL("snd/explode_small.wav"),
+	EXTRA_LIFE("snd/extra_life.wav");
 
 	private var player: AudioPlayer? = null
 	private val isMusic = filename.endsWith(".mid")
@@ -37,17 +34,13 @@ enum class Audio(private val filename: String) {
 	 * Plays this media if the respective sound or music setting is enabled. If the media is music, any other music playing is stopped first.
 	 * @param loop True to loop the sound until stopped, false to play it only once.
 	 */
-	@JvmOverloads
 	fun play(loop: Boolean = false) {
 		if (if (isMusic) isMusicEnabled else isSoundEnabled) {
 			if (isMusic) {
 				stopAll(true)
 			}
-			if (loop && player != null) {
-				player!!.stop = true
-			}
-			player = AudioPlayer(loop)
-			player!!.start()
+			if (loop) player?.stop()
+			player = AudioPlayer(filename, loop) { loop() }.apply { start() }
 		}
 	}
 
@@ -58,71 +51,13 @@ enum class Audio(private val filename: String) {
 
 	fun stop() {
 		if (equals(THRUST)) {
-			for (ship in ShipManager.ships) {
-				if (ship == null) continue
-				if (ship.isAccelerating) return
+			ShipManager.ships.filterNotNull().forEach {
+				if (it.isAccelerating) return
 			}
 		}
 		player?.run {
-			stop = true
+			stop()
 			player = null
-		}
-	}
-
-	private inner class AudioPlayer(private val doLoop: Boolean) : Thread() {
-		var stop = false
-
-		override fun run() {
-			val stream = try {
-				AudioSystem.getAudioInputStream(javaClass.getResource(filename))
-			} catch (e: UnsupportedAudioFileException) {
-				e.printStackTrace()
-				return
-			} catch (e: IOException) {
-				e.printStackTrace()
-				return
-			}
-			val format = stream.format
-			val line: SourceDataLine
-			try {
-				line = AudioSystem.getLine(DataLine.Info(SourceDataLine::class.java, format)) as SourceDataLine
-				line.open(format)
-			} catch (e: LineUnavailableException) {
-				e.printStackTrace()
-				return
-			} catch (e: IllegalStateException) {
-				e.printStackTrace()
-				return
-			}
-			line.start()
-			var nBytesRead = 0
-			val buffer = ByteArray(256)
-			stream.mark(32000)
-			try {
-				while (nBytesRead != -1 && !stop) {
-					nBytesRead = stream.read(buffer, 0, buffer.size)
-					if (nBytesRead >= 0 && !stop) {
-						line.write(buffer, 0, nBytesRead)
-					} else if (doLoop && !stop) {
-						if (stream.markSupported()) {
-							stream.reset()
-							nBytesRead = 0
-						} else {
-							loop()
-						}
-					}
-				}
-			} catch (e: IOException) {
-				e.printStackTrace()
-				return
-			} finally {
-				if (doLoop) {
-					line.flush()
-				} else {
-					line.drain()
-				}
-				line.close()
-			}
 		}
 	}
 
@@ -148,6 +83,8 @@ enum class Audio(private val filename: String) {
 			isMusicEnabled = isMusicEnabled xor true
 			if (!isMusicEnabled) {
 				stopAll(true)
+			} else if (Simulation.isStarted) {
+				MUSIC_GAME.loop()
 			}
 			return isMusicEnabled
 		}
