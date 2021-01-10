@@ -22,8 +22,13 @@ import Platform.Utils.Timer
 import Platform.Utils.toZeroPaddedString
 import kotlinx.browser.document
 import kotlinx.browser.window
+import org.w3c.dom.HTMLAnchorElement
 import org.w3c.dom.HTMLButtonElement
+import org.w3c.dom.HTMLDivElement
+import org.w3c.dom.HTMLElement
 import org.w3c.dom.events.KeyboardEvent
+import kotlin.collections.set
+import MultiplayerManager.Companion.instance as mpManager
 
 /** Creates the game view and objects required within it. */
 actual class GameView {
@@ -40,6 +45,11 @@ actual class GameView {
 	private val btnMusic = getButton("btnMusic")
 	private val btnHelp = getButton("btnHelp")
 	private val btnAbout = getButton("btnAbout")
+	private val gameDropdown = document.getElementById("gameDropdown") as HTMLDivElement
+	private val menuHost = getAnchor("gameHost")
+	private val menuConnect = getAnchor("gameConnect")
+	private val menuDisconnect = getAnchor("gameDisconnect")
+	private val txtHostId = getElement("hostId")
 	private val pressedKeys = HashMap<String, Boolean>(5)
 
 	init {
@@ -48,6 +58,7 @@ actual class GameView {
 		Bullet.init()
 		LevelManager.createBackgroundAsteroids()
 		initKeyListeners()
+		initConnectionListener()
 		window.onload = {
 			Timer().run((1000 / Simulation.TICK_RATE).toLong(), (1000 / Simulation.TICK_RATE).toLong()) {
 				if (!Simulation.isPaused()) {
@@ -60,7 +71,7 @@ actual class GameView {
 		Simulation.addGameStateListener(object : Simulation.GameStateListener {
 			override fun onGameStartStateChanged(started: Boolean) {
 				btnStart.innerHTML = if (started) "S<u>t</u>op" else "S<u>t</u>art"
-				if (MultiplayerManager.instance.isClient) {
+				if (mpManager.isClient) {
 					btnStart.disabled = true
 					if (started) {
 						LevelManager.startGame()
@@ -73,7 +84,7 @@ actual class GameView {
 			override fun onGamePauseStateChanged(paused: Boolean) {
 				btnPause.innerHTML = if (paused) "<u>C</u>ontinue" else "<u>P</u>ause"
 				btnPause.accessKey = if (paused) "C" else "P"
-				if (MultiplayerManager.instance.isClient) {
+				if (mpManager.isClient) {
 					Simulation.setPaused(paused)
 				}
 			}
@@ -122,6 +133,12 @@ actual class GameView {
 		}
 	}
 
+	private fun toggleGameMenu() {
+		gameDropdown.classList.toggle("show")
+	}
+
+	private fun getElement(id: String) = document.getElementById(id) as HTMLElement
+	private fun getAnchor(id: String) = document.getElementById(id) as HTMLAnchorElement
 	private fun getButton(id: String) = document.getElementById(id) as HTMLButtonElement
 
 	private fun initKeyListeners() {
@@ -138,6 +155,10 @@ actual class GameView {
 				LevelManager.startGame()
 			}
 		})
+		btnGame.addEventListener("click", {
+			it.stopPropagation()
+			toggleGameMenu()
+		})
 		btnPause.addEventListener("click", {
 			Simulation.setPaused(!Simulation.isPaused())
 		})
@@ -146,6 +167,52 @@ actual class GameView {
 		})
 		btnMusic.addEventListener("click", {
 			btnMusic.innerHTML = if (Audio.toggleMusic()) "<u>M</u>usic" else "(<u>m</u>usic)"
+		})
+		menuHost.addEventListener("click", {
+			mpManager.startHost()
+		})
+		menuConnect.addEventListener("click", {
+			window.prompt("Enter host ID")?.let {
+				mpManager.connect(it)
+			}
+		})
+		menuDisconnect.addEventListener("click", {
+			mpManager.disconnect()
+		})
+		document.body!!.addEventListener("click", {
+			if (gameDropdown.classList.contains("show")) toggleGameMenu()
+		})
+	}
+
+	private fun initConnectionListener() {
+		Platform.Network.ConnectionManager.instance.onHostId {
+			txtHostId.innerText = "Host ID: $it"
+		}
+		mpManager.setConnectionStateListener(object : MultiplayerManager.ConnectionStateListener {
+			override fun onHostWaiting() {
+				menuHost.style.display = "none"
+				menuConnect.style.display = "none"
+				menuDisconnect.style.display = ""
+			}
+
+			override fun onConnected() {
+				menuHost.style.display = "none"
+				menuConnect.style.display = "none"
+				menuDisconnect.style.display = ""
+				if (mpManager.isClient) {
+					btnStart.disabled = true
+					btnPause.disabled = true
+				}
+			}
+
+			override fun onDisconnected() {
+				txtHostId.innerText = ""
+				menuHost.style.display = ""
+				menuConnect.style.display = ""
+				menuDisconnect.style.display = "none"
+				btnStart.disabled = false
+				btnPause.disabled = false
+			}
 		})
 	}
 

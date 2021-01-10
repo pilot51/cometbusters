@@ -97,10 +97,9 @@ expect object Platform {
 			fun startHost()
 			fun stopHost()
 			fun connect(address: String)
-			fun disconnect(mpConn: MultiplayerManager.PlayerConnection)
-			fun send(mpConn: MultiplayerManager.PlayerConnection, data: String)
-			fun send(mpConn: MultiplayerManager.PlayerConnection, playerId: Int)
-			fun receive(mpConn: MultiplayerManager.PlayerConnection): String?
+			fun disconnect(player: MultiplayerManager.RemotePlayer)
+			fun send(player: MultiplayerManager.RemotePlayer, data: String)
+			fun send(player: MultiplayerManager.RemotePlayer, playerId: Int)
 			companion object {
 				val instance: ConnectionManager
 			}

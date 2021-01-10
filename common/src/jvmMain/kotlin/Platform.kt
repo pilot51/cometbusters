@@ -17,6 +17,8 @@
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import java.io.IOException
+import java.net.UnknownHostException
 import java.awt.Color as JavaColor
 import java.awt.Font as JavaFont
 import java.awt.Graphics as JavaGraphics
@@ -218,14 +220,16 @@ actual object Platform {
 			private var serverSocket: JavaServerSocket? = null
 
 			actual fun startHost() {
+				println("Starting host on port $PORT")
 				CoroutineScope(Dispatchers.IO).launch {
 					try {
-						serverSocket = JavaServerSocket(MultiplayerManager.PORT)
+						@Suppress("BlockingMethodInNonBlockingContext")
+						serverSocket = JavaServerSocket(PORT)
 					} catch (e: Exception) {
-						println("Could not listen on port ${MultiplayerManager.PORT}")
+						println("Could not listen on port $PORT")
 						return@launch
 					}
-					MultiplayerManager.instance.connectionListener.onHostWaiting()
+					mpManager.connectionListener.onHostWaiting()
 					var connectionsFull = false
 					while (serverSocket != null) {
 						if (connectionsFull) {
@@ -235,9 +239,11 @@ actual object Platform {
 							} else continue
 						}
 						try {
+							@Suppress("BlockingMethodInNonBlockingContext")
 							val conn = Connection(serverSocket!!.accept())
 							connections.add(conn)
-							MultiplayerManager.instance.onConnected(conn.mpConn)
+							mpManager.onConnected(conn.player)
+							startListening(conn.player)
 						} catch (e: Exception) {
 							if (serverSocket != null) {
 								println("Incoming client connection failed")
@@ -263,75 +269,82 @@ actual object Platform {
 			}
 
 			actual fun connect(address: String) {
+				println("Connecting to server: $address:$PORT")
 				CoroutineScope(Dispatchers.IO).launch {
 					try {
 						val conn = Connection(address)
 						connections.add(conn)
-						MultiplayerManager.instance.onConnected(conn.mpConn)
-					} catch (e: Exception) {
-						println("Failed to connect to server")
-						MultiplayerManager.instance.isClient = false
+						conn.player.id = receive(conn.player)!!.toInt()
+						mpManager.onConnected(conn.player)
+						startListening(conn.player)
+					} catch (e: UnknownHostException) {
+						println("Unknown host: $address")
+						mpManager.isClient = false
+					} catch (e: IOException) {
+						println("Connection failed!")
 						e.printStackTrace()
+						mpManager.isClient = false
 					}
 				}
 			}
 
-			actual fun disconnect(mpConn: MultiplayerManager.PlayerConnection) {
-				val conn = connections.find { it.ipRemote.hostAddress == mpConn.remoteAddress } ?: return
-				disconnect(conn)
+			private fun startListening(player: MultiplayerManager.RemotePlayer) {
+				CoroutineScope(Dispatchers.IO).launch {
+					while (mpManager.players.contains(player)) {
+						val msg = receive(player)
+						if (msg != null) {
+							mpManager.onReceive(player, msg)
+						} else {
+							mpManager.disconnect(player)
+							break
+						}
+					}
+				}
 			}
 
 			/**
 			 * Disconnects one connection.
-			 * @param conn The connection to disconnect.
+			 * @param player The player to disconnect.
 			 */
-			private fun disconnect(conn: Connection) {
+			actual fun disconnect(player: MultiplayerManager.RemotePlayer) {
+				val conn = connections.find { it.player == player } ?: return
 				if (!connections.remove(conn)) return
 				CoroutineScope(Dispatchers.IO).launch {
 					try {
+						@Suppress("BlockingMethodInNonBlockingContext")
 						conn.clientSocket.close()
-					} catch (e: Exception) {
+					} catch (e: IOException) {
 						e.printStackTrace()
 					}
 					if (connections.isEmpty() && serverSocket != null) {
 						stopHost()
 					}
+					println("Player ${conn.player.id} disconnected from " +
+						"${conn.ipRemote.hostAddress}:${conn.clientSocket.port}")
 				}
 			}
 
 			/**
 			 * Sends data to one connection.
-			 * @param mpConn The connection to send the data to.
+			 * @param player The player to send the data to.
 			 * @param data The data to be sent.
 			 */
-			actual fun send(mpConn: MultiplayerManager.PlayerConnection, data: String) {
-				val conn = connections.find { it.ipRemote.hostAddress == mpConn.remoteAddress } ?: return
-				send(conn, data)
-			}
-
-			private fun send(conn: Connection, data: String) {
+			actual fun send(player: MultiplayerManager.RemotePlayer, data: String) {
+				val conn = connections.find { it.player == player } ?: return
 				conn.out.println(data)
 			}
 
-			actual fun send(mpConn: MultiplayerManager.PlayerConnection, playerId: Int) {
-				val conn = connections.find { it.ipRemote.hostAddress == mpConn.remoteAddress } ?: return
-				send(conn, playerId)
-			}
-
-			private fun send(conn: Connection, playerId: Int) {
+			actual fun send(player: MultiplayerManager.RemotePlayer, playerId: Int) {
+				val conn = connections.find { it.player == player } ?: return
 				conn.out.println(playerId)
 			}
 
-			actual fun receive(mpConn: MultiplayerManager.PlayerConnection): String? {
-				val conn = connections.find { it.ipRemote.hostAddress == mpConn.remoteAddress } ?: return null
-				return receive(conn)
-			}
-
 			/**
-			 * Receives data from a connection.
-			 * @param conn The connection to receive the data from.
+			 * Receives data from a player.
+			 * @param player The player to receive the data from.
 			 */
-			private fun receive(conn: Connection): String? {
+			private fun receive(player: MultiplayerManager.RemotePlayer): String? {
+				val conn = connections.find { it.player == player } ?: return null
 				var msg: String? = null
 				try {
 					msg = conn.`in`.readLine()
@@ -342,7 +355,7 @@ actual object Platform {
 			}
 
 			private class Connection {
-				val mpConn: MultiplayerManager.PlayerConnection
+				val player = MultiplayerManager.RemotePlayer()
 				val clientSocket: JavaSocket
 				val out: JavaPrintWriter
 				val `in`: JavaBufferedReader
@@ -354,23 +367,23 @@ actual object Platform {
 					out = JavaPrintWriter(clientSocket.getOutputStream(), true)
 					`in` = JavaBufferedReader(JavaInputStreamReader(clientSocket.getInputStream()))
 					ipRemote = clientSocket.inetAddress
-					mpConn = MultiplayerManager.PlayerConnection(
-						ipRemote.hostAddress, clientSocket.port, MultiplayerManager.PORT)
+					println("Incoming connection: ${ipRemote.hostAddress}:${clientSocket.port}")
 				}
 
 				/** As client: Host connection */
 				constructor(hostAddress: String) {
 					ipRemote = JavaInetAddress.getByName(hostAddress)
-					clientSocket = JavaSocket(hostAddress, MultiplayerManager.PORT)
+					clientSocket = JavaSocket(hostAddress, PORT)
 					out = JavaPrintWriter(clientSocket.getOutputStream(), true)
 					`in` = JavaBufferedReader(JavaInputStreamReader(clientSocket.inputStream))
-					mpConn = MultiplayerManager.PlayerConnection(
-						ipRemote.hostAddress, MultiplayerManager.PORT, clientSocket.localPort)
+					println("Local client port: ${clientSocket.localPort}")
 				}
 			}
 
 			actual companion object {
 				actual val instance by lazy { ConnectionManager() }
+				private val mpManager = MultiplayerManager.instance
+				private const val PORT = 50001
 			}
 		}
 	}
