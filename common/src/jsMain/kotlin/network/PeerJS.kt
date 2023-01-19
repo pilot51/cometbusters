@@ -16,11 +16,11 @@
 
 package network
 
-import kotlinext.js.jsObject
+import js.core.jso
 
 /** [Original source](https://github.com/ColoredCarrot/poker-game/blob/38c8ee8b/src/main/kotlin/comm/PeerJS.kt) */
 object PeerJS {
-	private val PEERJS_CLOUD_INIT = jsObject<dynamic> {
+	private val PEERJS_CLOUD_INIT = jso<dynamic> {
 		debug = 2
 	}
 

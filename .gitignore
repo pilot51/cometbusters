@@ -11,3 +11,6 @@ build/
 .gradletasknamecache
 **/build/
 
+### Other ###
+kotlin-js-store/
+

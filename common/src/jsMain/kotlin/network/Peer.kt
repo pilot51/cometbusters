@@ -16,7 +16,7 @@
 
 package network
 
-import kotlinext.js.jsObject
+import js.core.jso
 
 /** [Original source](https://github.com/ColoredCarrot/poker-game/blob/38c8ee8b/src/main/kotlin/comm/Peer.kt) */
 class Peer {
@@ -53,7 +53,7 @@ class Peer {
 
 	fun connect(theirId: String) {
 		@Suppress("UNCHECKED_CAST_TO_EXTERNAL_INTERFACE", "RemoveExplicitTypeArguments")
-		val them = peer.connect(theirId, jsObject<dynamic> {
+		val them = peer.connect(theirId, jso<dynamic> {
 			reliable = false
 			serialization = "none"
 		}) as DataConnection

@@ -1,9 +1,17 @@
 plugins {
 	id("java")
-	id("org.jetbrains.kotlin.jvm")
+	kotlin("jvm")
 }
 
 dependencies {
 	implementation(project(":common"))
-	implementation("org.jetbrains.kotlin:kotlin-stdlib-jdk8")
+}
+
+tasks.register<Copy>("copyResources") {
+	from("../common/src/commonMain/resources")
+	into("build/resources/main")
+}
+
+tasks.named("processResources") {
+	finalizedBy("copyResources")
 }
