@@ -1,7 +1,5 @@
-import org.w3c.dom.Audio as JsAudio
-
 /*
- * Copyright 2020 Mark Injerd
+ * Copyright 2020-2023 Mark Injerd
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,13 +14,15 @@ import org.w3c.dom.Audio as JsAudio
  * limitations under the License.
  */
 
+import org.w3c.dom.Audio as JsAudio
+
 actual class AudioPlayer actual constructor(
 	private val filename: String,
 	private val doLoop: Boolean,
 	private val loopCallback: () -> Unit
 ) {
 	private val isMusic = filename.endsWith(".mid")
-	private val jsAudio = JsAudio(filename).apply { loop = doLoop }
+	private val jsAudio = if (!isMusic) getAudio(filename).apply { loop = doLoop } else null
 
 	actual fun start() {
 		if (isMusic) {
@@ -30,7 +30,7 @@ actual class AudioPlayer actual constructor(
 			val filename = filename
 			js("MIDIjs.play(filename)")
 		} else {
-			jsAudio.play()
+			jsAudio!!.play()
 		}
 	}
 
@@ -38,8 +38,18 @@ actual class AudioPlayer actual constructor(
 		if (isMusic) {
 			js("MIDIjs.stop()")
 		} else {
-			jsAudio.pause()
-			jsAudio.currentTime = 0.0
+			jsAudio!!.apply {
+				pause()
+				currentTime = 0.0
+			}
 		}
+	}
+
+	companion object {
+		private val audioCache = mutableMapOf<String, JsAudio>()
+
+		private fun getAudio(filename: String) =
+			audioCache[filename]?.cloneNode(true) as JsAudio?
+				?: JsAudio(filename).also { audioCache[filename] = it }
 	}
 }

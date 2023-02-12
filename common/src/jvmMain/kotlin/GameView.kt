@@ -1,5 +1,5 @@
 /*
- * Copyright 2013 Mark Injerd
+ * Copyright 2013-2023 Mark Injerd
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -37,8 +37,6 @@ actual class GameView @Throws(IOException::class) constructor() : JComponent(), 
 
 	init {
 		preferredSize = Dimension(VIEW_WIDTH, VIEW_HEIGHT)
-		Audio.init()
-		Bullet.init()
 		LevelManager.createBackgroundAsteroids()
 		addKeyListener(this)
 		isFocusable = true

@@ -1,5 +1,5 @@
 /*
- * Copyright 2013 Mark Injerd
+ * Copyright 2013-2023 Mark Injerd
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -45,7 +45,7 @@ abstract class Entity(
 	private val radians = Math.toRadians(direction.toDouble())
 	protected var velX: Float = sin(radians).toFloat() * velocity
 	protected var velY: Float = cos(radians).toFloat() * velocity
-	var radius = 0
+	open var radius = 0
 		protected set
 	/** True to accelerate at the predefined rate, false to stop accelerating. */
 	var isAccelerating = false

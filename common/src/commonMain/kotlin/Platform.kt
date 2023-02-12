@@ -1,5 +1,5 @@
 /*
- * Copyright 2020 Mark Injerd
+ * Copyright 2020-2023 Mark Injerd
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -29,22 +29,19 @@ expect object Platform {
 	}
 
 	object Resources {
-		class Image {
+		open class Image {
 			val width: Int
 			val height: Int
 
 			constructor(filePath: String, onLoad: ((Image) -> Unit)? = null)
-			constructor(mutableImage: MutableImage)
+			protected constructor(image: Image)
 		}
 
-		class MutableImage {
-			val width: Int
-			val height: Int
+		class MutableImage : Image {
+			constructor(filePath: String, onLoad: ((Image) -> Unit)? = null)
+			private constructor(orig: MutableImage)
 
-			constructor(filePath: String)
-			constructor(orig: MutableImage)
-
-			fun toImmutableImage(): Image
+			fun copy(): MutableImage
 			fun setSingleColor(rgb: Int)
 			fun setHue(hue: Float)
 		}
@@ -86,7 +83,6 @@ expect object Platform {
 			fun drawText(text: String, x: Int, y: Int)
 			fun drawImage(image: Resources.Image, x: Int, y: Int)
 			fun drawImage(image: Resources.Image, transform: Transform2D)
-			fun drawImage(image: Resources.MutableImage, transform: Transform2D)
 		}
 
 		class Rectangle2D

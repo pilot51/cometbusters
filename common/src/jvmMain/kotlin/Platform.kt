@@ -1,5 +1,5 @@
 /*
- * Copyright 2020 Mark Injerd
+ * Copyright 2020-2023 Mark Injerd
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -23,7 +23,6 @@ import java.awt.Color as JavaColor
 import java.awt.Font as JavaFont
 import java.awt.Graphics as JavaGraphics
 import java.awt.Graphics2D as JavaGraphics2D
-import java.awt.Image as JavaImage
 import java.awt.font.FontRenderContext as JavaFontRenderContext
 import java.awt.font.TextLayout as JavaTextLayout
 import java.awt.geom.AffineTransform as JavaAffineTransform
@@ -67,8 +66,8 @@ actual object Platform {
 	}
 
 	actual object Resources {
-		actual class Image {
-			val javaImage: JavaImage
+		actual open class Image {
+			val javaImage: JavaBufferedImage
 			actual val width get() = javaImage.getWidth(null)
 			actual val height get() = javaImage.getHeight(null)
 
@@ -79,45 +78,35 @@ actual object Platform {
 				}
 			}
 
-			actual constructor(mutableImage: MutableImage) {
-				javaImage = mutableImage.javaImage
+			protected actual constructor(image: Image) {
+				val cm = image.javaImage.colorModel
+				javaImage = JavaBufferedImage(
+					cm, image.javaImage.copyData(null), cm.isAlphaPremultiplied, null
+				)
 			}
 		}
 
-		actual class MutableImage {
-			val javaImage: JavaBufferedImage
+		actual class MutableImage : Image {
+			actual constructor(filePath: String, onLoad: ((Image) -> Unit)?) : super(filePath, onLoad)
+			private actual constructor(orig: MutableImage) : super(orig)
 
-			actual constructor(filePath: String) {
-				javaImage = JavaImageIO.read(javaClass.getResource(filePath))
+			actual fun copy(): MutableImage = MutableImage(this)
+
+			actual fun setSingleColor(rgb: Int) = setPixelColors { rgb }
+
+			actual fun setHue(hue: Float) = setPixelColors {
+				RenderUtils.adjustHue(it, hue)
 			}
 
-			actual constructor(orig: MutableImage) {
-				val cm = orig.javaImage.colorModel
-				javaImage = JavaBufferedImage(cm, orig.javaImage.copyData(null), cm.isAlphaPremultiplied, null)
-			}
-
-			actual val width get() = javaImage.width
-			actual val height get() = javaImage.height
-
-			actual fun setSingleColor(rgb: Int) {
+			private fun setPixelColors(convertPixelColor: (pixRgb: Int) -> Int) {
 				for (x in 0 until width) {
 					for (y in 0 until height) {
-						if (RenderUtils.getAlpha(javaImage.getRGB(x, y)) == 0) continue
-						javaImage.setRGB(x, y, rgb)
+						val pixRgb = javaImage.getRGB(x, y)
+						if (RenderUtils.getAlpha(pixRgb) == 0) continue
+						javaImage.setRGB(x, y, convertPixelColor(pixRgb))
 					}
 				}
 			}
-			actual fun setHue(hue: Float) {
-				for (x in 0 until width) {
-					for (y in 0 until height) {
-						val rgb = javaImage.getRGB(x, y)
-						if (RenderUtils.getAlpha(rgb) == 0) continue
-						javaImage.setRGB(x, y, RenderUtils.adjustHue(rgb, hue))
-					}
-				}
-			}
-
-			actual fun toImmutableImage() = Image(this)
 		}
 
 		actual class Font actual constructor(name: String, style: Style, size: Int) {
@@ -191,10 +180,6 @@ actual object Platform {
 			}
 
 			actual fun drawImage(image: Resources.Image, transform: Transform2D) {
-				javaGraphics2D.drawImage(image.javaImage, transform.javaTransform, null)
-			}
-
-			actual fun drawImage(image: Resources.MutableImage, transform: Transform2D) {
 				javaGraphics2D.drawImage(image.javaImage, transform.javaTransform, null)
 			}
 		}

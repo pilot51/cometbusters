@@ -1,5 +1,5 @@
 /*
- * Copyright 2020 Mark Injerd
+ * Copyright 2020-2023 Mark Injerd
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -33,6 +33,7 @@ import MultiplayerManager.Companion.instance as mpManager
 /** Creates the game view and objects required within it. */
 actual class GameView {
 	private val renderView = RenderView2D(VIEW_WIDTH, VIEW_HEIGHT)
+	private val bgImage = Image("img/background.png")
 	private val btn1 = getButton("btn1")
 	private val btn2 = getButton("btn2")
 	private val btn3 = getButton("btn3")
@@ -54,8 +55,6 @@ actual class GameView {
 
 	init {
 		document.body!!.append(renderView.jsCanvas)
-		Audio.init()
-		Bullet.init()
 		LevelManager.createBackgroundAsteroids()
 		initKeyListeners()
 		initConnectionListener()
@@ -92,7 +91,7 @@ actual class GameView {
 	}
 
 	private fun update() {
-		renderView.drawImage(Image("img/background.png"), 0, 0)
+		renderView.drawImage(bgImage, 0, 0)
 		renderView.setFont(Font(Font.ARIAL, Font.Style.PLAIN, 22))
 		val ships = ShipManager.ships
 		ships.filterNotNull().forEachIndexed { i, ship ->

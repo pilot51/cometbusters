@@ -1,5 +1,5 @@
 /*
- * Copyright 2013 Mark Injerd
+ * Copyright 2013-2023 Mark Injerd
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -62,10 +62,6 @@ enum class Audio(private val filename: String) {
 	}
 
 	companion object {
-		fun init() {
-			values()
-		}
-
 		private var isSoundEnabled = true
 		private var isMusicEnabled = true
 

@@ -1,5 +1,5 @@
 /*
- * Copyright 2013 Mark Injerd
+ * Copyright 2013-2023 Mark Injerd
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,22 +16,37 @@
 
 import Platform.Renderer.RenderView2D
 import Platform.Renderer.Transform2D
-import Platform.Resources
+import Platform.Resources.Color
 import Platform.Resources.Image
 import Platform.Resources.MutableImage
 import Platform.Utils.Math
 import Platform.Utils.Timer
+import RenderUtils.PLAYER_HUES
+import RenderUtils.applyHue
+import RenderUtils.convertToSolidColor
 import kotlin.math.abs
 import kotlin.math.cos
 import kotlin.math.sin
 
 /** Creates a new ship, initially not spawned. Call [spawn] to spawn the ship. */
 class Ship internal constructor() : Entity(0f, 0f, 0, 0, THRUST, ROTATE_SPEED) {
-	private var image: MutableImage = RenderUtils.getPlayerShipImage(0)
+	private var image = getPlayerShipImage(0)
 	private var imageSpawning: MutableImage? = null
-	private lateinit var thrustImages: Array<Image>
+	private val thrustImages = arrayOf(
+		Image("img/thrust1.png"),
+		Image("img/thrust2.png")
+	)
 	private var thrustRadius: Int = 0
+		get() {
+			if (field == 0) field = thrustImages[0].width / 2
+			return field
+		}
 	private val trans = Transform2D()
+	override var radius = 0
+		get() {
+			if (field == 0) field = image.width / 2
+			return field
+		}
 
 	/**
 	 * Gets a list of live bullets fired by this ship, after removing expired bullets.
@@ -49,16 +64,6 @@ class Ship internal constructor() : Entity(0f, 0f, 0, 0, THRUST, ROTATE_SPEED) {
 
 	init {
 		super.destroy()
-		radius = image.width / 2
-		try {
-			thrustImages = arrayOf(
-				Image("img/thrust1.png"),
-				Image("img/thrust2.png")
-			)
-			thrustRadius = thrustImages[0].width / 2
-		} catch (e: Exception) {
-			e.printStackTrace()
-		}
 	}
 
 	/** Forces update of ship position, rotation, and thrust. */
@@ -74,7 +79,7 @@ class Ship internal constructor() : Entity(0f, 0f, 0, 0, THRUST, ROTATE_SPEED) {
 	 * @param playerId The player ID used to determine color.
 	 */
 	fun setPlayerColor(playerId: Int) {
-		image = RenderUtils.getPlayerShipImage(playerId)
+		image = getPlayerShipImage(playerId)
 	}
 
 	fun drawShip(view2D: RenderView2D) {
@@ -85,7 +90,7 @@ class Ship internal constructor() : Entity(0f, 0f, 0, 0, THRUST, ROTATE_SPEED) {
 		}
 		if (isSpawning) {
 			if (imageSpawning == null) {
-				imageSpawning = RenderUtils.convertImageToSingleColorWithAlpha(image, Resources.Color.WHITE)
+				imageSpawning = getSolidColorShip(Color.WHITE)
 			}
 		} else {
 			imageSpawning = null
@@ -239,5 +244,23 @@ class Ship internal constructor() : Entity(0f, 0f, 0, 0, THRUST, ROTATE_SPEED) {
 		private const val RESPAWN_DELAY = 2000
 		private const val MATERIALIZE_TIME = 300
 		private const val NEW_SHIP_SCORE = 10000
+
+		val baseShipImage = MutableImage("img/ship.png")
+		private val solidColorShipImages = mutableMapOf<Color, MutableImage>()
+
+		fun getPlayerShipImage(playerId: Int) =
+			if (playerId == 0) baseShipImage
+			else applyHue(baseShipImage, PLAYER_HUES[playerId])
+
+		/**
+		 * Converts all pixels from [baseShipImage] that aren't fully transparent to the specified color.
+		 * Converted images are cached in [solidColorShipImages].
+		 * @param fillColor The desired color.
+		 * @return The converted image as a new [MutableImage].
+		 */
+		fun getSolidColorShip(fillColor: Color) = solidColorShipImages[fillColor]
+			?: baseShipImage.convertToSolidColor(fillColor).also {
+				solidColorShipImages[fillColor] = it
+			}
 	}
 }

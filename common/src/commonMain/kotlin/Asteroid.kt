@@ -1,5 +1,5 @@
 /*
- * Copyright 2013 Mark Injerd
+ * Copyright 2013-2023 Mark Injerd
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -27,10 +27,11 @@ class Asteroid internal constructor(
 	val size: Size
 ) : Entity(x, y, direction, velocity) {
 	private val trans = Transform2D()
-
-	init {
-		radius = image[size.ordinal]!!.width / 2
-	}
+	override var radius = 0
+		get() {
+			if (field == 0) field = image[size.ordinal]!!.width / 2
+			return field
+		}
 
 	private constructor(x: Float, y: Float, direction: Int, velocity: Int) : this(x, y, direction, velocity, Size.LARGE)
 

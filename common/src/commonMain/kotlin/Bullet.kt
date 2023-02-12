@@ -1,5 +1,5 @@
 /*
- * Copyright 2013 Mark Injerd
+ * Copyright 2013-2023 Mark Injerd
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -50,24 +50,18 @@ class Bullet internal constructor(val playerId: Int, x: Float, y: Float, deg: In
 		}
 
 	companion object {
-		private var image: Image? = null
-
 		/** Static method to get bullet radius, since all bullets have the same radius. */
 		var bulletRadius = 0
 			private set
+		private val image = Image("img/deadly_bullet.png") {
+			bulletRadius = it.width / 2
+		}
 		private const val DURATION: Long = 2000
 		private const val SPEED = 25
 
-		/** Loads bullet image. */
-		fun init() {
-			image = Image("img/deadly_bullet.png") {
-				bulletRadius = it.width / 2
-			}
-		}
-
 		fun drawBullets(view2D: RenderView2D, ship: Ship) {
 			ship.bullets.filter { !it.isDestroyed }.forEach {
-				view2D.drawImage(image!!, it.transform)
+				view2D.drawImage(image, it.transform)
 			}
 		}
 	}

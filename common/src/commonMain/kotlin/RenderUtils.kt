@@ -1,5 +1,5 @@
 /*
- * Copyright 2016 Mark Injerd
+ * Copyright 2016-2023 Mark Injerd
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -23,25 +23,24 @@ import kotlin.math.min
 
 object RenderUtils {
 	val PLAYER_COLORS = arrayOf(Color.CYAN, Color.MAGENTA, Color.GREEN, Color.YELLOW)
-	private val PLAYER_HUES = intArrayOf(180, 300, 120, 60)
+	val PLAYER_HUES = intArrayOf(180, 300, 120, 60)
 	val TEXT_LEVEL_COLOR = Color(255, 32, 128)
 	val TEXT_GAMEOVER_COLOR = Color(32, 255, 64)
-	private val baseShipImage = MutableImage("img/ship.png")
 
 	/**
-	 * Converts all pixels from the source image that aren't fully transparent to the specified color.
-	 * @param src Source image to convert.
+	 * Converts all pixels that aren't fully transparent to the specified color.
 	 * @param fillColor The desired color.
 	 * @return The converted image as a new [MutableImage].
 	 */
-	fun convertImageToSingleColorWithAlpha(src: MutableImage, fillColor: Color) =
-		MutableImage(src).apply { setSingleColor(fillColor.rgba) }
+	fun MutableImage.convertToSolidColor(fillColor: Color) =
+		copy().apply { setSingleColor(fillColor.rgba) }
 
 	fun drawLives(view2D: RenderView2D, lives: Int, color: Color, x: Int, y: Int) {
+		if (Ship.baseShipImage.width == 0) return
 		val ship = ShipManager.localShip
-		val imageLife = convertImageToSingleColorWithAlpha(baseShipImage, color)
-		val imageUsedLife = convertImageToSingleColorWithAlpha(baseShipImage, Color.WHITE)
-		val width = baseShipImage.width
+		val imageLife = Ship.getSolidColorShip(color)
+		val imageUsedLife = Ship.getSolidColorShip(Color.WHITE)
+		val width = Ship.baseShipImage.width
 		val radius = width / 2
 		val lifeScale = 0.5
 		val lifeWidth = width * lifeScale - 2
@@ -67,21 +66,14 @@ object RenderUtils {
 		}
 	}
 
-	fun getPlayerShipImage(playerId: Int): MutableImage {
-		return if (playerId == 0) {
-			baseShipImage
-		} else {
-			applyHue(baseShipImage, PLAYER_HUES[playerId])
-		}
-	}
-
 	/**
 	 * Applies the specified hue to an image.
 	 * @param src The source image.
 	 * @param hue The hue value between 0 and 360.
 	 * @return A copy of the source image with the hue applied.
 	 */
-	private fun applyHue(src: MutableImage, hue: Int) = MutableImage(src).apply { setHue(hue.toFloat()) }
+	fun applyHue(src: MutableImage, hue: Int) =
+		src.copy().apply { setHue(hue.toFloat()) }
 
 	// All below code for changing hue was copied with minor modifications from
 	// http://www.camick.com/java/source/HSLColor.java (blog post: https://tips4java.wordpress.com/2009/07/05/hsl-color)

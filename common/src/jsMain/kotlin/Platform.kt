@@ -1,5 +1,5 @@
 /*
- * Copyright 2020 Mark Injerd
+ * Copyright 2020-2023 Mark Injerd
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -48,7 +48,7 @@ actual object Platform {
 	}
 
 	actual object Resources {
-		actual class Image {
+		actual open class Image {
 			val jsImage: JsImage
 			var jsCanvas: JsHTMLCanvasElement? = null
 			actual val width get() = jsImage.width
@@ -63,30 +63,36 @@ actual object Platform {
 				}
 			}
 
-			actual constructor(mutableImage: MutableImage) {
-				jsImage = mutableImage.jsImage
-				jsCanvas = mutableImage.jsCanvas
+			protected actual constructor(image: Image) {
+				jsImage = image.jsImage.cloneNode(true) as JsImage
+				jsCanvas = image.jsCanvas
 			}
 		}
 
-		actual class MutableImage {
-			val jsImage: JsImage
-			var jsCanvas: JsHTMLCanvasElement? = null
+		actual class MutableImage : Image {
+			actual constructor(filePath: String, onLoad: ((Image) -> Unit)?) : super(filePath, onLoad)
+			private actual constructor(orig: MutableImage) : super(orig)
 
-			actual constructor(filePath: String) {
-				jsImage = JsImage().apply { src = filePath }
-			}
-
-			actual constructor(orig: MutableImage) {
-				jsImage = orig.jsImage.cloneNode(true) as JsImage
-				jsCanvas = orig.jsCanvas
-			}
-
-			actual val width get() = jsImage.width
-			actual val height get() = jsImage.height
+			actual fun copy(): MutableImage = MutableImage(this)
 
 			actual fun setSingleColor(rgb: Int) {
 				val rgbArray = RenderUtils.rgbaToIntArray(rgb)
+				setPixelColors { _, _ -> rgbArray }
+			}
+
+			actual fun setHue(hue: Float) = setPixelColors { data, i ->
+				val rgba = RenderUtils.rgbaComponentsToInt(
+					data[i + 0].toInt(),
+					data[i + 1].toInt(),
+					data[i + 2].toInt(),
+					data[i + 3].toInt()
+				)
+				RenderUtils.rgbaToIntArray(RenderUtils.adjustHue(rgba, hue))
+			}
+
+			private fun setPixelColors(
+				convertPixelColor: (data: Uint16Array, index: Int) -> IntArray
+			) {
 				val view = Renderer.RenderView2D(width, height)
 				jsCanvas = view.jsCanvas
 				view.jsCanvas2D.drawImage(jsImage, 0.0, 0.0)
@@ -94,39 +100,20 @@ actual object Platform {
 				val data = imageData.data.unsafeCast<Uint16Array>()
 				for (i in 0 until data.length step 4) {
 					if (data[i + 3] == 0.toShort()) continue
-					data[i] = rgbArray[0].toShort() // red
-					data[i + 1] = rgbArray[1].toShort() // green
-					data[i + 2] = rgbArray[2].toShort() // blue
+					val colorArray = convertPixelColor(data, i)
+					data[i] = colorArray[0].toShort() // red
+					data[i + 1] = colorArray[1].toShort() // green
+					data[i + 2] = colorArray[2].toShort() // blue
 				}
 				view.jsCanvas2D.putImageData(imageData, 0.0, 0.0)
 			}
-
-			actual fun setHue(hue: Float) {
-				val view = Renderer.RenderView2D(width, height)
-				jsCanvas = view.jsCanvas
-				view.jsCanvas2D.drawImage(jsImage, 0.0, 0.0)
-				val imageData = view.jsCanvas2D.getImageData(0.0, 0.0, width.toDouble(), height.toDouble())
-				val data = imageData.data.unsafeCast<Uint16Array>()
-				for (i in 0 until data.length step 4) {
-					if (data[i + 3] == 0.toShort()) continue
-					val rgba = RenderUtils.rgbaComponentsToInt(
-						data[i + 0].toInt(),
-						data[i + 1].toInt(),
-						data[i + 2].toInt(),
-						data[i + 3].toInt()
-					)
-					val result = RenderUtils.rgbaToIntArray(RenderUtils.adjustHue(rgba, hue))
-					data[i] = result[0].toShort()
-					data[i + 1] = result[1].toShort()
-					data[i + 2] = result[2].toShort()
-				}
-				view.jsCanvas2D.putImageData(imageData, 0.0, 0.0)
-			}
-
-			actual fun toImmutableImage() = Image(this)
 		}
 
-		actual class Font actual constructor(val name: String, val style: Style, val size: Int) {
+		actual class Font actual constructor(
+			private val name: String,
+			private val style: Style,
+			private val size: Int
+		) {
 			override fun toString() = "${style.jsWeight} ${size}px $name"
 
 			actual enum class Style(val jsWeight: String) {
@@ -140,21 +127,18 @@ actual object Platform {
 			}
 		}
 
-		actual class Color constructor(val jsColor: String) {
-			actual val rgba: Int = processColor()
+		actual class Color constructor(
+			val jsColor: String
+		) {
+			actual val rgba: Int by lazy {
+				val ctx = (document.createElement("canvas") as JsHTMLCanvasElement)
+					.getContext("2d") as JsCanvasRenderingContext2D
+				ctx.fillStyle = jsColor
+				val hexColor = ctx.fillStyle as String
+				hexColor.removePrefix("#").toInt(16)
+			}
 
 			actual constructor(r: Int, g: Int, b: Int) : this(RenderUtils.rgbaToHex(r, g, b))
-
-			private fun processColor(): Int {
-				val array = Renderer.RenderView2D(1, 1).jsCanvas2D.run {
-					fillStyle = jsColor
-					fillRect(0.0, 0.0, 1.0, 1.0)
-					getImageData(0.0, 0.0, 1.0, 1.0).data
-				}
-				return RenderUtils.rgbaComponentsToInt(
-					array[0].toInt(), array[1].toInt(), array[2].toInt(), array[3].toInt()
-				)
-			}
 
 			actual companion object {
 				actual val WHITE: Color = Color("white")
@@ -213,10 +197,6 @@ actual object Platform {
 					xform.translateX, xform.translateY)
 				jsCanvas2D.drawImage(image.jsCanvas ?: image.jsImage, 0.0, 0.0)
 				jsCanvas2D.restore()
-			}
-
-			actual fun drawImage(image: Resources.MutableImage, transform: Transform2D) {
-				drawImage(image.toImmutableImage(), transform)
 			}
 		}
 
