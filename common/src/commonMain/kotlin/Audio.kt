@@ -14,7 +14,9 @@
  * limitations under the License.
  */
 
-enum class Audio(private val filename: String) {
+enum class Audio(
+	val filename: String
+) {
 	MUSIC_GAME("snd/comet.mid"),
 	MUSIC_DEATH("snd/comet1.mid"),
 	MUSIC_HIGHSCORE("snd/comet2.mid"),
@@ -28,7 +30,7 @@ enum class Audio(private val filename: String) {
 	EXTRA_LIFE("snd/extra_life.wav");
 
 	private var player: AudioPlayer? = null
-	private val isMusic = filename.endsWith(".mid")
+	val isMusic = filename.endsWith(".mid")
 
 	/**
 	 * Plays this media if the respective sound or music setting is enabled. If the media is music, any other music playing is stopped first.
@@ -40,7 +42,7 @@ enum class Audio(private val filename: String) {
 				stopAll(true)
 			}
 			if (loop) player?.stop()
-			player = AudioPlayer(filename, loop) { loop() }.apply { start() }
+			player = AudioPlayer(this, loop).apply { start() }
 		}
 	}
 

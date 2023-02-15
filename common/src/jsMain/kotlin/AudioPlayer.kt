@@ -14,42 +14,65 @@
  * limitations under the License.
  */
 
-import org.w3c.dom.Audio as JsAudio
+import externals.AudioBuffer
+import externals.AudioBufferSourceNode
+import externals.AudioContext
+import externals.MIDIjs
+import kotlinx.browser.window
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.await
+import kotlinx.coroutines.launch
+import org.w3c.fetch.CORS
+import org.w3c.fetch.RequestInit
+import org.w3c.fetch.RequestMode
 
 actual class AudioPlayer actual constructor(
-	private val filename: String,
-	private val doLoop: Boolean,
-	private val loopCallback: () -> Unit
+	private val audio: Audio,
+	private val doLoop: Boolean
 ) {
-	private val isMusic = filename.endsWith(".mid")
-	private val jsAudio = if (!isMusic) getAudio(filename).apply { loop = doLoop } else null
+	private var srcNode: AudioBufferSourceNode? = null
 
 	actual fun start() {
-		if (isMusic) {
-			@Suppress("UNUSED_VARIABLE")
-			val filename = filename
-			js("MIDIjs.play(filename)")
+		if (audio.isMusic) {
+			MIDIjs.play(audio.filename, true)
 		} else {
-			jsAudio!!.play()
+			getAudio { play(it) }
 		}
 	}
 
 	actual fun stop() {
-		if (isMusic) {
-			js("MIDIjs.stop()")
+		if (audio.isMusic) {
+			MIDIjs.stop()
 		} else {
-			jsAudio!!.apply {
-				pause()
-				currentTime = 0.0
-			}
+			srcNode?.stop()
 		}
 	}
 
-	companion object {
-		private val audioCache = mutableMapOf<String, JsAudio>()
+	private fun play(audioBuffer: AudioBuffer) {
+		srcNode = audioContext.createBufferSource().apply {
+			buffer = audioBuffer
+			loop = doLoop
+			connect(audioContext.destination)
+			start()
+		}
+	}
 
-		private fun getAudio(filename: String) =
-			audioCache[filename]?.cloneNode(true) as JsAudio?
-				?: JsAudio(filename).also { audioCache[filename] = it }
+	private fun getAudio(callback: (AudioBuffer) -> Unit) =
+		audioCache[audio]?.let(callback) ?: run {
+			window.fetch(audio.filename, RequestInit(mode = RequestMode.CORS)).then {
+				it.arrayBuffer()
+			}.then {
+				CoroutineScope(Dispatchers.Default).launch {
+					val buffer = audioContext.decodeAudioData(it).await()
+					audioCache[audio] = buffer
+					callback(buffer)
+				}
+			}
+		}
+
+	companion object {
+		private val audioContext = AudioContext()
+		private val audioCache = mutableMapOf<Audio, AudioBuffer>()
 	}
 }

@@ -16,7 +16,6 @@
 
 import kotlinx.browser.document
 import kotlinx.browser.window
-import network.Peer
 import org.khronos.webgl.Uint16Array
 import org.khronos.webgl.get
 import org.khronos.webgl.set
@@ -218,12 +217,12 @@ actual object Platform {
 	actual object Network {
 		actual class ConnectionManager {
 			private val connections: MutableList<Connection> = ArrayList()
-			private lateinit var peer: Peer
+			private lateinit var peer: PeerHelper
 			private lateinit var onHostId: ((hostId: String?) -> Unit)
 
 			actual fun startHost() {
 				println("Starting host")
-				peer = Peer().apply {
+				peer = PeerHelper().apply {
 					hook.onOpen { sessionId ->
 						onHostId(sessionId)
 					}
@@ -255,7 +254,7 @@ actual object Platform {
 
 			actual fun connect(address: String) {
 				println("Connecting to server: $address")
-				peer = Peer().apply {
+				peer = PeerHelper().apply {
 					hook.onOpen {
 						connect(address)
 					}

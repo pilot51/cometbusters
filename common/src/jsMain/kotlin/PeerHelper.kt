@@ -1,5 +1,5 @@
 /*
- * Copyright 2021 Mark Injerd
+ * Copyright 2021-2023 Mark Injerd
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -14,13 +14,14 @@
  * limitations under the License.
  */
 
-package network
+import externals.DataConnection
+import externals.Peer
+import externals.PeerConnectOption
+import externals.PeerOptions
 
-import js.core.jso
-
-/** [Original source](https://github.com/ColoredCarrot/poker-game/blob/38c8ee8b/src/main/kotlin/comm/Peer.kt) */
-class Peer {
-	private val peer = PeerJS.createPeer()
+/** [Original source](https://github.com/ColoredCarrot/poker-game/blob/38c8ee8b/src/main/kotlin/comm/network.Peer.kt) */
+class PeerHelper {
+	private val peer = createPeer()
 	private val remotes = LinkedHashMap<String, DataConnection>(3)
 	val hook = Hook()
 
@@ -45,21 +46,17 @@ class Peer {
 			remotes.clear()
 		}
 
-		peer.on("error") { err: dynamic ->
-			log("Connection error: ", err)
+		peer.on("error") { err: Error ->
+			log("Connection error: ", err.message)
 			hook.error?.let { it(err) }
 		}
 	}
 
 	fun connect(theirId: String) {
-		@Suppress("UNCHECKED_CAST_TO_EXTERNAL_INTERFACE", "RemoveExplicitTypeArguments")
-		val them = peer.connect(theirId, jso<dynamic> {
-			reliable = false
-			serialization = "none"
-		}) as DataConnection
+		val them = peer.connect(theirId, PEERJS_CONNECT_OPTS)
 		remotes[theirId] = them
-		them.on("error") { err: dynamic ->
-			log("error connecting to $theirId: ", err)
+		them.on("error") { err: Error ->
+			log("error connecting to $theirId: ", err.message)
 			hook.errConnecting?.let { it(err) }
 		}
 		ready(them)
@@ -76,19 +73,16 @@ class Peer {
 
 	private fun ready(remote: DataConnection) {
 		val remoteId = remote.peer
-
-		remote.on("open", fun() {
+		remote.on("open") {
 			hook.connected?.let { it(remoteId) }
-		})
-
-		remote.on("data", fun(data: dynamic) {
-			hook.receiveData?.let { it(data as String) }
-		})
-
-		remote.on("close", fun() {
+		}
+		remote.on("data") { data: String ->
+			hook.receiveData?.let { it(data) }
+		}
+		remote.on("close") {
 			hook.disconnected?.let { it(remoteId) }
 			remotes.remove(remoteId)
-		})
+		}
 	}
 
 	fun send(sessionId: String, data: String) {
@@ -101,29 +95,23 @@ class Peer {
 		}
 	}
 
-	private fun log(msg: String, vararg more: dynamic) = console.log("[Peer] $msg", *more)
+	private fun log(msg: String, vararg more: Any?) = console.log("[network.Peer] $msg", *more)
 
 	class Hook {
 		internal var open: ((String) -> Unit)? = null
 		internal var close: (() -> Unit)? = null
-		internal var error: ((dynamic) -> Unit)? = null
+		internal var error: ((Error) -> Unit)? = null
 		internal var connected: ((String) -> Unit)? = null
 		internal var disconnected: ((String) -> Unit)? = null
-		internal var errConnecting: ((dynamic) -> Unit)? = null
+		internal var errConnecting: ((Error) -> Unit)? = null
 		internal var receiveData: ((String) -> Unit)? = null
 
 		fun onOpen(handler: ((peerId: String) -> Unit)?) = run { open = handler }
-
 		fun onClose(handler: (() -> Unit)?) = run { close = handler }
-
-		fun onError(handler: ((err: dynamic) -> Unit)?) = run { error = handler }
-
+		fun onError(handler: ((err: Error) -> Unit)?) = run { error = handler }
 		fun onConnected(handler: ((peerId: String) -> Unit)?) = run { connected = handler }
-
 		fun onDisconnected(handler: ((peerId: String) -> Unit)?) = run { disconnected = handler }
-
-		fun onErrorConnecting(handler: ((err: dynamic) -> Unit)?) = run { errConnecting = handler }
-
+		fun onErrorConnecting(handler: ((err: Error) -> Unit)?) = run { errConnecting = handler }
 		fun onReceiveData(handler: ((data: String) -> Unit)?) = run { receiveData = handler }
 
 		internal fun clear() {
@@ -136,12 +124,16 @@ class Peer {
 			receiveData = null
 		}
 	}
-}
 
-private external interface DataConnection {
-	val peer: String
-	val open: Boolean
-	fun close()
-	fun send(data: dynamic)
-	fun on(event: String, callback: dynamic)
+	companion object {
+		private val PEERJS_CLOUD_INIT = PeerOptions().apply {
+			debug = 2
+		}
+		private val PEERJS_CONNECT_OPTS = PeerConnectOption().apply {
+			reliable = false
+			serialization = "none"
+		}
+
+		private fun createPeer() = Peer(null, PEERJS_CLOUD_INIT)
+	}
 }

@@ -1,5 +1,5 @@
 /*
- * Copyright 2021 Mark Injerd
+ * Copyright 2023 Mark Injerd
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -14,21 +14,9 @@
  * limitations under the License.
  */
 
-package network
+package externals
 
-import js.core.jso
-
-/** [Original source](https://github.com/ColoredCarrot/poker-game/blob/38c8ee8b/src/main/kotlin/comm/PeerJS.kt) */
-object PeerJS {
-	private val PEERJS_CLOUD_INIT = jso<dynamic> {
-		debug = 2
-	}
-
-	private var init = PEERJS_CLOUD_INIT
-
-	fun createPeer(): dynamic {
-		@Suppress("UNUSED_VARIABLE")
-		val init = init
-		return js("new Peer(null, init)")
-	}
+external object MIDIjs {
+	fun play(url: String, loop: Boolean = definedExternally)
+	fun stop()
 }

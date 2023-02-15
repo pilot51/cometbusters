@@ -1,5 +1,5 @@
 /*
- * Copyright 2020 Mark Injerd
+ * Copyright 2020-2023 Mark Injerd
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -19,16 +19,15 @@ import javax.sound.sampled.*
 import kotlin.concurrent.thread
 
 actual class AudioPlayer actual constructor(
-	private val filename: String,
-	private val doLoop: Boolean,
-	private val loopCallback: () -> Unit
+	private val audio: Audio,
+	private val doLoop: Boolean
 ) {
 	private var stop = false
 
 	actual fun start() {
 		thread(start = true) {
 			val stream = try {
-				AudioSystem.getAudioInputStream(javaClass.getResource(filename))
+				AudioSystem.getAudioInputStream(javaClass.getResource(audio.filename))
 			} catch (e: UnsupportedAudioFileException) {
 				e.printStackTrace()
 				return@thread
@@ -62,7 +61,7 @@ actual class AudioPlayer actual constructor(
 							stream.reset()
 							nBytesRead = 0
 						} else {
-							loopCallback()
+							start()
 						}
 					}
 				}
