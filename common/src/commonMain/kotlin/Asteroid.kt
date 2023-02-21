@@ -18,6 +18,7 @@ import Platform.Renderer.RenderView2D
 import Platform.Renderer.Transform2D
 import Platform.Resources.Image
 import kotlin.random.Random
+import MultiplayerManager.Companion.instance as mpMan
 
 class Asteroid internal constructor(
 	x: Float,
@@ -69,7 +70,7 @@ class Asteroid internal constructor(
 		if (asteroids.isEmpty()) {
 			LevelManager.nextLevel()
 		}
-		MultiplayerManager.instance.sendAsteroids()
+		mpMan.sendAsteroids()
 	}
 
 	companion object {
@@ -118,7 +119,7 @@ class Asteroid internal constructor(
 					))
 				}
 			}
-			MultiplayerManager.instance.sendAsteroids()
+			mpMan.sendAsteroids()
 		}
 
 		fun drawAsteroids(view2D: RenderView2D) {

@@ -20,6 +20,7 @@ import org.khronos.webgl.Uint16Array
 import org.khronos.webgl.get
 import org.khronos.webgl.set
 import kotlin.math.PI
+import MultiplayerManager.Companion.instance as mpMan
 import org.w3c.dom.CanvasRenderingContext2D as JsCanvasRenderingContext2D
 import org.w3c.dom.HTMLCanvasElement as JsHTMLCanvasElement
 import org.w3c.dom.Image as JsImage
@@ -42,6 +43,12 @@ actual object Platform {
 
 			actual fun cancel() {
 				window.clearInterval(id)
+			}
+
+			companion object {
+				fun delay(delay: Long, execute: () -> Unit) {
+					window.setTimeout({ execute() }, delay.toInt())
+				}
 			}
 		}
 	}
@@ -218,7 +225,7 @@ actual object Platform {
 		actual class ConnectionManager {
 			private val connections: MutableList<Connection> = ArrayList()
 			private lateinit var peer: PeerHelper
-			private lateinit var onHostId: ((hostId: String?) -> Unit)
+			lateinit var onHostId: ((hostId: String?) -> Unit)
 
 			actual fun startHost() {
 				println("Starting host")
@@ -230,21 +237,17 @@ actual object Platform {
 						println("Incoming connection: $sessionId")
 						val conn = Connection(sessionId)
 						connections.add(conn)
-						mpManager.onConnected(conn.player)
+						mpMan.onConnected(conn.player)
 						startListening(conn.player)
 					}
 					hook.onErrorConnecting {
 						println("Incoming client connection failed")
 					}
 					hook.onDisconnected { sessionId ->
-						mpManager.disconnect(connections.single { it.sessionId == sessionId }.player)
+						mpMan.disconnect(connections.single { it.sessionId == sessionId }.player)
 					}
 				}
-				mpManager.connectionListener.onHostWaiting()
-			}
-
-			fun onHostId(handler: (hostId: String?) -> Unit) {
-				onHostId = handler
+				mpMan.connectionListener.onHostWaiting()
 			}
 
 			actual fun stopHost() {
@@ -262,28 +265,28 @@ actual object Platform {
 						onHostId(sessionId)
 						val conn = Connection(sessionId)
 						connections.add(conn)
-						if (mpManager.isClient) {
+						if (mpMan.isClient) {
 							hook.onReceiveData { playerId ->
 								hook.onReceiveData(null)
 								conn.player.id = playerId.toInt()
-								mpManager.onConnected(conn.player)
+								mpMan.onConnected(conn.player)
 								startListening(conn.player)
 							}
 						}
 					}
 					hook.onErrorConnecting {
 						println("Failed to connect to server")
-						mpManager.isClient = false
+						mpMan.isClient = false
 					}
 					hook.onDisconnected { sessionId ->
-						mpManager.disconnect(connections.single { it.sessionId == sessionId }.player)
+						mpMan.disconnect(connections.single { it.sessionId == sessionId }.player)
 					}
 				}
 			}
 
 			private fun startListening(player: MultiplayerManager.RemotePlayer) {
 				peer.hook.onReceiveData {
-					mpManager.onReceive(player, it)
+					mpMan.onReceive(player, it)
 				}
 			}
 
@@ -291,7 +294,7 @@ actual object Platform {
 				val conn = connections.find { it.player == player } ?: return
 				if (!connections.remove(conn)) return
 				peer.disconnect(conn.sessionId)
-				if (connections.isEmpty() && !mpManager.isClient) {
+				if (connections.isEmpty() && mpMan.isHost) {
 					stopHost()
 				}
 				println("Player ${player.id} disconnected from ${conn.sessionId}")
@@ -313,7 +316,6 @@ actual object Platform {
 
 			actual companion object {
 				actual val instance by lazy { ConnectionManager() }
-				private val mpManager = MultiplayerManager.instance
 			}
 		}
 	}

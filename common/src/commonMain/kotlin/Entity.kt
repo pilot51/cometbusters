@@ -43,8 +43,8 @@ abstract class Entity(
 ) {
 	val pos: Position = Position(x, y)
 	private val radians = Math.toRadians(direction.toDouble())
-	protected var velX: Float = sin(radians).toFloat() * velocity
-	protected var velY: Float = cos(radians).toFloat() * velocity
+	var velX: Float = sin(radians).toFloat() * velocity
+	var velY: Float = cos(radians).toFloat() * velocity
 	open var radius = 0
 		protected set
 	/** True to accelerate at the predefined rate, false to stop accelerating. */
@@ -56,7 +56,7 @@ abstract class Entity(
 		protected set
 
 	/** Current rotation direction and speed. Positive is clockwise, negative is counter-clockwise. */
-	private var rotation = 0
+	var rotation = 0
 
 	/**
 	 * True if this entity is destroyed (not active), false if not.
@@ -100,29 +100,36 @@ abstract class Entity(
 
 	/**
 	 * Rotates entity left at the predefined speed.
+	 * @return True if [rotation] changed.
 	 * @see rotateRight
 	 * @see rotateStop
 	 */
-	fun rotateLeft() {
-		rotation = -rotationSpeed
-	}
+	open fun rotateLeft() = setRotation(-rotationSpeed)
 
 	/**
 	 * Rotates entity right at the predefined speed.
+	 * @return True if [rotation] changed.
 	 * @see rotateLeft
 	 * @see rotateStop
 	 */
-	fun rotateRight() {
-		rotation = rotationSpeed
-	}
+	open fun rotateRight() = setRotation(rotationSpeed)
 
 	/**
 	 * Stops entity rotation.
+	 * @return True if [rotation] changed.
 	 * @see rotateLeft
 	 * @see rotateRight
 	 */
-	fun rotateStop() {
-		rotation = 0
+	open fun rotateStop() = setRotation(0)
+
+	/**
+	 * Sets entity rotation direction/speed.
+	 * @return True if [rotation] changed.
+	 */
+	private fun setRotation(r: Int): Boolean {
+		if (rotation == r) return false
+		rotation = r
+		return true
 	}
 
 	/**

@@ -1,5 +1,5 @@
 /*
- * Copyright 2016 Mark Injerd
+ * Copyright 2016-2023 Mark Injerd
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,6 +13,8 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
+import MultiplayerManager.Companion.instance as mpMan
 
 object ShipManager {
 	val localShip by lazy { Ship() }
@@ -55,7 +57,7 @@ object ShipManager {
 	fun getPlayerId(ship: Ship?) = ships.indexOf(ship)
 
 	fun getSpawnPosition(playerId: Int): Entity.Position {
-		return if (MultiplayerManager.instance.isConnected) {
+		return if (mpMan.isConnected) {
 			MP_SPAWN_POSITIONS[playerId]
 		} else {
 			Entity.Position((GameView.VIEW_WIDTH / 2).toFloat(), (GameView.VIEW_HEIGHT / 2).toFloat())

@@ -18,6 +18,7 @@ import Asteroid.Size
 import Platform.Renderer.RenderView2D
 import Platform.Renderer.Transform2D
 import Platform.Resources.Image
+import MultiplayerManager.Companion.instance as mpMan
 
 /**
  * Creates a new bullet.
@@ -36,7 +37,7 @@ class Bullet internal constructor(val playerId: Int, x: Float, y: Float, deg: In
 	}
 
 	override fun calculateMotion() {
-		if (Simulation.simulationTime - timeCreated > DURATION) {
+		if (mpMan.isHost && Simulation.simulationTime - timeCreated > DURATION) {
 			destroy()
 			return
 		}

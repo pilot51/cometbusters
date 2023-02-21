@@ -17,7 +17,7 @@
 import externals.DataConnection
 import externals.Peer
 import externals.PeerConnectOption
-import externals.PeerOptions
+import externals.PeerJSOption
 
 /** [Original source](https://github.com/ColoredCarrot/poker-game/blob/38c8ee8b/src/main/kotlin/comm/network.Peer.kt) */
 class PeerHelper {
@@ -126,12 +126,12 @@ class PeerHelper {
 	}
 
 	companion object {
-		private val PEERJS_CLOUD_INIT = PeerOptions().apply {
-			debug = 2
+		private val PEERJS_CLOUD_INIT = object : PeerJSOption {
+			override var debug: Int? = 2
 		}
-		private val PEERJS_CONNECT_OPTS = PeerConnectOption().apply {
-			reliable = false
-			serialization = "none"
+		private val PEERJS_CONNECT_OPTS = object : PeerConnectOption {
+			override var reliable = false
+			override var serialization = "none"
 		}
 
 		private fun createPeer() = Peer(null, PEERJS_CLOUD_INIT)

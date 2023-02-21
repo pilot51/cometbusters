@@ -27,6 +27,7 @@ import java.awt.event.KeyListener
 import java.io.IOException
 import java.util.*
 import javax.swing.*
+import MultiplayerManager.Companion.instance as mpMan
 
 /**
  * Creates the game view and objects required within it.
@@ -60,7 +61,7 @@ actual class GameView @Throws(IOException::class) constructor() : JComponent(), 
 			val color = RenderUtils.PLAYER_COLORS[i]
 			view2D.setColor(color)
 			view2D.drawText(ship.score.toZeroPaddedString(7), x, y)
-			RenderUtils.drawLives(view2D, ship.lives, color, x, y + 14)
+			RenderUtils.drawLives(view2D, ship, color, x, y + 14)
 		}
 		Asteroid.drawAsteroids(view2D)
 		ships.filterNotNull().forEach {
@@ -154,15 +155,15 @@ actual class GameView @Throws(IOException::class) constructor() : JComponent(), 
 		buttonGame.addActionListener { popupGame.show(buttonGame, 0, buttonGame.bounds.height) }
 		menuHost.addActionListener {
 			Simulation.isStarted = false
-			MultiplayerManager.instance.startHost()
+			mpMan.startHost()
 		}
 		menuConnect.addActionListener {
 			val address = JOptionPane.showInputDialog(this@GameView, "Address", "Connect", JOptionPane.QUESTION_MESSAGE)
 			if (address != null) {
-				MultiplayerManager.instance.connect(address)
+				mpMan.connect(address)
 			}
 		}
-		menuDisconnect.addActionListener { MultiplayerManager.instance.disconnect() }
+		menuDisconnect.addActionListener { mpMan.disconnect() }
 		buttonPause.addActionListener { Simulation.setPaused(!Simulation.isPaused()) }
 		buttonSound.addActionListener { buttonSound.text = if (Audio.toggleSound()) "Sound" else "(sound)" }
 		buttonMusic.addActionListener {
@@ -187,7 +188,7 @@ actual class GameView @Throws(IOException::class) constructor() : JComponent(), 
 		Simulation.addGameStateListener(object : Simulation.GameStateListener {
 			override fun onGameStartStateChanged(started: Boolean) {
 				buttonStart.text = if (started) "Stop" else "Start"
-				if (MultiplayerManager.instance.isClient) {
+				if (mpMan.isClient) {
 					buttonStart.isEnabled = false
 					if (started) {
 						LevelManager.startGame()
@@ -200,12 +201,12 @@ actual class GameView @Throws(IOException::class) constructor() : JComponent(), 
 			override fun onGamePauseStateChanged(paused: Boolean) {
 				buttonPause.text = if (paused) "Continue" else "Pause"
 				buttonPause.mnemonic = if (paused) KeyEvent.VK_C else KeyEvent.VK_P
-				if (MultiplayerManager.instance.isClient) {
+				if (mpMan.isClient) {
 					Simulation.setPaused(paused)
 				}
 			}
 		})
-		MultiplayerManager.instance.setConnectionStateListener(object : MultiplayerManager.ConnectionStateListener {
+		mpMan.setConnectionStateListener(object : MultiplayerManager.ConnectionStateListener {
 			override fun onHostWaiting() {
 				menuHost.isVisible = false
 				menuConnect.isVisible = false
@@ -216,7 +217,7 @@ actual class GameView @Throws(IOException::class) constructor() : JComponent(), 
 				menuHost.isVisible = false
 				menuConnect.isVisible = false
 				menuDisconnect.isVisible = true
-				if (MultiplayerManager.instance.isClient) {
+				if (mpMan.isClient) {
 					buttonStart.isEnabled = false
 					buttonPause.isEnabled = false
 				}
@@ -237,7 +238,7 @@ actual class GameView @Throws(IOException::class) constructor() : JComponent(), 
 		val ship = ShipManager.localShip
 		if (e.isConsumed || ship.isDestroyed || Simulation.isPaused()) return
 		when (e.keyCode) {
-			KeyEvent.VK_UP -> ship.thrust(true)
+			KeyEvent.VK_UP -> ship.thrust(activate = true, isFromInput = true)
 			KeyEvent.VK_LEFT -> ship.rotateLeft()
 			KeyEvent.VK_RIGHT -> ship.rotateRight()
 			KeyEvent.VK_SPACE, KeyEvent.VK_CONTROL -> ship.fire()
@@ -248,7 +249,7 @@ actual class GameView @Throws(IOException::class) constructor() : JComponent(), 
 		if (e.isConsumed) return
 		val ship = ShipManager.localShip
 		when (e.keyCode) {
-			KeyEvent.VK_UP -> ship.thrust(false)
+			KeyEvent.VK_UP -> ship.thrust(activate = false, isFromInput = true)
 			KeyEvent.VK_LEFT, KeyEvent.VK_RIGHT -> ship.rotateStop()
 		}
 	}

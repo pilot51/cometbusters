@@ -1,5 +1,5 @@
 /*
- * Copyright 2016 Mark Injerd
+ * Copyright 2016-2023 Mark Injerd
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,6 +13,8 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
+import MultiplayerManager.Companion.instance as mpMan
 
 object Simulation {
 	/** Number of simulations per second. */
@@ -57,32 +59,41 @@ object Simulation {
 	/** Runs one simulation cycle. */
 	fun simulate() {
 		if (isPaused) return
-		val localShip = ShipManager.localShip
 		simulationTime += (1000 / TICK_RATE).toLong()
-		if (!localShip.isDestroyed) {
-			localShip.calculateMotion()
+		val ships = ShipManager.ships.filterNotNull()
+		ships.forEach { ship ->
+			if (!ship.isDestroyed) ship.calculateMotion()
+			val playerId by lazy { ShipManager.getPlayerId(ship) }
+			val iterator = ship.bullets.listIterator()
+			while (iterator.hasNext()) {
+				val index = iterator.nextIndex()
+				val bullet = iterator.next()
+				bullet.calculateMotion()
+				if (bullet.isDestroyed && mpMan.isHost) {
+					mpMan.sendDestroyedBullet(playerId, index)
+					iterator.remove()
+				}
+			}
 		}
 		Asteroid.asteroids.forEach {
 			it.calculateMotion()
 		}
-		if (MultiplayerManager.instance.isClient) {
-			localShip.bullets.removeAll { it.isDestroyed }
-		} else {
-			ShipManager.ships.filterNotNull().forEach { ship ->
-				ship.bullets.forEach {
-					it.calculateMotion()
-				}
-			}
-			checkCollisions()
-		}
-		MultiplayerManager.instance.sendShipUpdate()
+		if (mpMan.isHost) checkCollisions()
+		mpMan.tick()
 	}
 
 	private fun checkCollisions() {
-		if (MultiplayerManager.instance.isClient) return
+		if (mpMan.isClient) return
 		val localShip = ShipManager.localShip
-		ShipManager.ships.filterNotNull().forEach { ship ->
+		val ships = ShipManager.ships.filterNotNull()
+		ships.forEach { ship ->
+			val playerId by lazy { ShipManager.getPlayerId(ship) }
 			// Ship vs. ship
+			ships.forEach { otherShip ->
+				if (ship != otherShip && otherShip.isContacting(ship)) {
+					otherShip.collide(ship)
+				}
+			}
 			if (ship != localShip && localShip.isContacting(ship)) {
 				localShip.collide(ship)
 			}
@@ -91,16 +102,12 @@ object Simulation {
 				ship.collide(it)
 			}
 			run bulletsLoop@ { ship.bullets.reversed().forEach { bullet ->
-				// Local bullet vs. remote ship
-				if (ship == localShip) {
-					ShipManager.ships.find { it != null && it != localShip && bullet.isContacting(it) }?.let {
-						bullet.collide(it)
+				// Bullet vs. other ship
+				ships.forEach { otherShip ->
+					if (ship != otherShip && bullet.isContacting(otherShip)) {
+						bullet.collide(otherShip)
+						return@bulletsLoop
 					}
-				}
-				// Remote bullet vs. local ship
-				if (ship != localShip && bullet.isContacting(localShip)) {
-					bullet.collide(localShip)
-					return@bulletsLoop
 				}
 				// Bullet vs. asteroid
 				Asteroid.asteroids.findLast { bullet.isContacting(it) }?.let {
@@ -109,7 +116,9 @@ object Simulation {
 				}
 				updateScore(ship, bullet)
 				if (bullet.isDestroyed) {
+					val index = ship.bullets.indexOf(bullet)
 					ship.bullets.remove(bullet)
+					mpMan.sendDestroyedBullet(playerId, index)
 				}
 			}}
 		}

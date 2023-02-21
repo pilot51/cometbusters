@@ -1,5 +1,5 @@
 /*
- * Copyright 2016 Mark Injerd
+ * Copyright 2016-2023 Mark Injerd
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -15,6 +15,7 @@
  */
 
 import Platform.Utils.Timer
+import MultiplayerManager.Companion.instance as mpMan
 
 object LevelManager {
 	/** Milliseconds to wait before new level begins. */
@@ -36,13 +37,12 @@ object LevelManager {
 	/** Starts a new game at level 1. */
 	fun startGame() {
 		Simulation.isStarted = true
-		if (MultiplayerManager.instance.isClient) {
-			ShipManager.localShip.reset(true)
-		} else {
+		if (mpMan.isHost) {
 			startLevel(1)
 			ShipManager.ships.filterNotNull().forEach {
 				it.reset(true)
 				it.spawn()
+				mpMan.sendShipWithScoreData(it)
 			}
 		}
 		Audio.MUSIC_GAME.loop()
@@ -76,7 +76,7 @@ object LevelManager {
 		if (level == 1) {
 			Asteroid.asteroids.clear()
 		}
-		MultiplayerManager.instance.sendLevel()
+		mpMan.sendLevel()
 		Asteroid.setLevelImages(level)
 		val startTime = Simulation.simulationTime
 		Timer().run(Simulation.TICK_RATE.toLong(), (1000 / Simulation.TICK_RATE).toLong()) {
@@ -84,9 +84,7 @@ object LevelManager {
 				it.cancel()
 				shouldShowText = false
 			} else if (Simulation.simulationTime - startTime >= NEW_LEVEL_WAIT) {
-				if (!MultiplayerManager.instance.isClient) {
-					Asteroid.generateAsteroids()
-				}
+				if (mpMan.isHost) Asteroid.generateAsteroids()
 				it.cancel()
 				shouldShowText = false
 			}

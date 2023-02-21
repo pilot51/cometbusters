@@ -16,18 +16,18 @@
 
 package externals
 
-external class Peer(id: String?, options: PeerOptions?) {
+external class Peer(id: String?, options: PeerJSOption?) {
 	fun connect(peer: String, options: PeerConnectOption): DataConnection
 	fun destroy()
 	fun on(event: String, callback: Function<Unit>)
 }
 
-external class PeerOptions {
+external interface PeerJSOption {
 	/** 1: Errors, 2: Warnings, 3: All logs */
 	var debug: Int?
 }
 
-external class PeerConnectOption {
+external interface PeerConnectOption {
 	var reliable: Boolean
 	var serialization: String
 }

@@ -28,7 +28,8 @@ import org.w3c.dom.HTMLDivElement
 import org.w3c.dom.HTMLElement
 import org.w3c.dom.events.KeyboardEvent
 import kotlin.collections.set
-import MultiplayerManager.Companion.instance as mpManager
+import MultiplayerManager.Companion.instance as mpMan
+import Platform.Network.ConnectionManager.Companion.instance as connMan
 
 /** Creates the game view and objects required within it. */
 actual class GameView {
@@ -70,7 +71,7 @@ actual class GameView {
 		Simulation.addGameStateListener(object : Simulation.GameStateListener {
 			override fun onGameStartStateChanged(started: Boolean) {
 				btnStart.innerHTML = if (started) "S<u>t</u>op" else "S<u>t</u>art"
-				if (mpManager.isClient) {
+				if (mpMan.isClient) {
 					btnStart.disabled = true
 					if (started) {
 						LevelManager.startGame()
@@ -83,7 +84,7 @@ actual class GameView {
 			override fun onGamePauseStateChanged(paused: Boolean) {
 				btnPause.innerHTML = if (paused) "<u>C</u>ontinue" else "<u>P</u>ause"
 				btnPause.accessKey = if (paused) "C" else "P"
-				if (mpManager.isClient) {
+				if (mpMan.isClient) {
 					Simulation.setPaused(paused)
 				}
 			}
@@ -100,7 +101,7 @@ actual class GameView {
 			val color = RenderUtils.PLAYER_COLORS[i]
 			renderView.setColor(color)
 			renderView.drawText(ship.score.toZeroPaddedString(7), x, y)
-			RenderUtils.drawLives(renderView, ship.lives, color, x, y + 14)
+			RenderUtils.drawLives(renderView, ship, color, x, y + 14)
 		}
 		Asteroid.drawAsteroids(renderView)
 		ships.filterNotNull().forEach {
@@ -168,15 +169,15 @@ actual class GameView {
 			btnMusic.innerHTML = if (Audio.toggleMusic()) "<u>M</u>usic" else "(<u>m</u>usic)"
 		})
 		menuHost.addEventListener("click", {
-			mpManager.startHost()
+			mpMan.startHost()
 		})
 		menuConnect.addEventListener("click", {
 			window.prompt("Enter host ID")?.let {
-				mpManager.connect(it)
+				mpMan.connect(it)
 			}
 		})
 		menuDisconnect.addEventListener("click", {
-			mpManager.disconnect()
+			mpMan.disconnect()
 		})
 		document.body!!.addEventListener("click", {
 			if (gameDropdown.classList.contains("show")) toggleGameMenu()
@@ -184,10 +185,25 @@ actual class GameView {
 	}
 
 	private fun initConnectionListener() {
-		Platform.Network.ConnectionManager.instance.onHostId {
-			txtHostId.innerText = "Host ID: $it"
+		connMan.onHostId = { hostId ->
+			txtHostId.apply {
+				if (hostId != null) {
+					innerText = "Host ID: $hostId"
+					onclick = {
+						window.navigator.clipboard.writeText(hostId)
+						val copied = " (copied!)"
+						innerText += copied
+						Timer.delay(5000L) {
+							innerText = innerText.removeSuffix(copied)
+						}
+					}
+				} else {
+					innerText = ""
+					onclick = null
+				}
+			}
 		}
-		mpManager.setConnectionStateListener(object : MultiplayerManager.ConnectionStateListener {
+		mpMan.setConnectionStateListener(object : MultiplayerManager.ConnectionStateListener {
 			override fun onHostWaiting() {
 				menuHost.style.display = "none"
 				menuConnect.style.display = "none"
@@ -198,14 +214,17 @@ actual class GameView {
 				menuHost.style.display = "none"
 				menuConnect.style.display = "none"
 				menuDisconnect.style.display = ""
-				if (mpManager.isClient) {
+				if (mpMan.isClient) {
 					btnStart.disabled = true
 					btnPause.disabled = true
 				}
 			}
 
 			override fun onDisconnected() {
-				txtHostId.innerText = ""
+				txtHostId.apply {
+					innerText = ""
+					onclick = null
+				}
 				menuHost.style.display = ""
 				menuConnect.style.display = ""
 				menuDisconnect.style.display = "none"
@@ -228,7 +247,7 @@ actual class GameView {
 				if (pressedKeys[event.key] == true) return
 				pressedKeys[event.key] = true
 				when (event.key) {
-					Key.UP -> ship.thrust(true)
+					Key.UP -> ship.thrust(activate = true, isFromInput = true)
 					Key.LEFT -> ship.rotateLeft()
 					Key.RIGHT -> ship.rotateRight()
 					Key.SPACE, Key.CTRL -> ship.fire()
@@ -237,7 +256,7 @@ actual class GameView {
 			"keyup" -> {
 				if (pressedKeys[event.key] != true) return
 				when (event.code) {
-					Key.UP -> ship.thrust(false)
+					Key.UP -> ship.thrust(activate = false, isFromInput = true)
 					Key.LEFT, Key.RIGHT -> ship.rotateStop()
 				}
 				pressedKeys[event.key] = false

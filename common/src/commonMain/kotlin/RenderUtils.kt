@@ -35,9 +35,9 @@ object RenderUtils {
 	fun MutableImage.convertToSolidColor(fillColor: Color) =
 		copy().apply { setSingleColor(fillColor.rgba) }
 
-	fun drawLives(view2D: RenderView2D, lives: Int, color: Color, x: Int, y: Int) {
+	fun drawLives(view2D: RenderView2D, ship: Ship, color: Color, x: Int, y: Int) {
 		if (Ship.baseShipImage.width == 0) return
-		val ship = ShipManager.localShip
+		val lives = ship.lives
 		val imageLife = Ship.getSolidColorShip(color)
 		val imageUsedLife = Ship.getSolidColorShip(Color.WHITE)
 		val width = Ship.baseShipImage.width

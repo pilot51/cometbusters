@@ -1,5 +1,5 @@
 /*
- * Copyright 2016 Mark Injerd
+ * Copyright 2016-2023 Mark Injerd
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -15,15 +15,19 @@
  */
 
 import Asteroid.Size
-import Platform.Network.ConnectionManager.Companion.instance as connManager
+import MultiplayerManager.GameData.Companion.getData
 import Simulation.GameStateListener
 import kotlin.math.max
 import kotlin.math.min
+import Platform.Network.ConnectionManager.Companion.instance as connMan
 
 class MultiplayerManager private constructor() {
 	val players: MutableList<RemotePlayer> = ArrayList()
 	var isConnected = false
 	var isClient = false
+	val isHost get() = !isClient
+	private var lastAsteroidsUpdate: Long = -1
+	private var lastLocalShipUpdate: Long = -1
 	lateinit var connectionListener: ConnectionStateListener
 	private val gameStateListener: GameStateListener = object : GameStateListener {
 		override fun onGameStartStateChanged(started: Boolean) {
@@ -51,69 +55,56 @@ class MultiplayerManager private constructor() {
 
 	fun onReceive(player: RemotePlayer, msg: String) {
 		val data = msg.split(" ").toTypedArray()
-		when (data[MESSAGE_TYPE].toInt()) {
-			MESSAGE_TYPE_GAME -> onReceiveGameData(
-				data[IS_STARTED].toBoolean(), data[IS_PAUSED].toBoolean())
-			MESSAGE_TYPE_LEVEL -> onReceiveLevel(data[LEVEL].toInt())
-			MESSAGE_TYPE_ASTEROIDS -> {
-				var asteroids: MutableList<Asteroid>? = null
-				if (data.size > ASTEROID_POSX) {
-					asteroids = ArrayList()
-					var i = 0
-					while (i * ASTEROIDS_DATA_SIZE + ASTEROID_POSX < data.size) {
-						asteroids.add(
-							Asteroid(
-								data[i * ASTEROIDS_DATA_SIZE + ASTEROID_POSX].toFloat(),
-								data[i * ASTEROIDS_DATA_SIZE + ASTEROID_POSY].toFloat(),
-								data[i * ASTEROIDS_DATA_SIZE + ASTEROID_DIR].toInt(),
-								data[i * ASTEROIDS_DATA_SIZE + ASTEROID_VEL].toInt(),
-								Size.valueOf(data[i * ASTEROIDS_DATA_SIZE + ASTEROID_SIZE])
-							)
-						)
-						i++
-					}
-				}
-				onReceiveAsteroidData(asteroids)
-			}
-			MESSAGE_TYPE_PLAYER -> if (data.size == 3) {
-				onReceivePlayerConnectionStatus(data[PLAYER_ID].toInt(),
-					data[PLAYER_IS_CONNECTED].toBoolean())
-			} else {
-				var bullets: MutableList<Bullet>? = null
-				if (data.size > SHIP_BULLET_POSX) {
-					bullets = ArrayList()
-					var i = 0
-					while (i * SHIP_BULLET_DATA_SIZE + SHIP_BULLET_POSX < data.size) {
-						bullets.add(Bullet(
-							data[PLAYER_ID].toInt(),
-							data[i * SHIP_BULLET_DATA_SIZE + SHIP_BULLET_POSX].toFloat(),
-							data[i * SHIP_BULLET_DATA_SIZE + SHIP_BULLET_POSY].toFloat(),
-							data[i * SHIP_BULLET_DATA_SIZE + SHIP_BULLET_DIR].toInt()
-						))
-						i++
-					}
-				}
-				onReceivePlayerData(player, data[PLAYER_ID].toInt(),
-					data[POSX].toFloat(), data[POSY].toFloat(), data[DIRECTION].toInt(),
-					data[ACCEL].toBoolean(), data[DESTROYED].toBoolean(), data[SCORE].toInt(),
-					data[LIVES].toInt(), bullets)
-			}
-			MESSAGE_TYPE_BULLET -> onReceiveFiredBulletData(player.ship!!, Bullet(
-				data[PLAYER_ID].toInt(),
-				data[POSX].toFloat(), data[POSY].toFloat(), data[DIRECTION].toInt()
-			))
+		when (data[MessageType.dataIndex].toInt()) {
+			MessageType.GAME.ordinal -> onReceiveGameData(
+				GameData.getIsStarted(data),
+				GameData.getIsPaused(data)
+			)
+			MessageType.LEVEL.ordinal -> onReceiveLevel(
+				LevelData.getLevel(data)
+			)
+			MessageType.ASTEROIDS.ordinal -> onReceiveAsteroids(
+				AsteroidData.getAsteroids(data)
+			)
+			MessageType.PLAYER_CONN.ordinal -> onReceivePlayerConnectionStatus(
+				PlayerConnData.getPlayerId(data),
+				PlayerConnData.getIsConnected(data)
+			)
+			MessageType.SCORE_LIVES.ordinal -> onReceiveScoreAndLives(
+				ScoreLivesData.getPlayerId(data),
+				ScoreLivesData.getScore(data),
+				ScoreLivesData.getLives(data)
+			)
+			MessageType.SHIP.ordinal -> onReceiveShip(
+				ShipData.getPlayerId(data),
+				ShipData.getPosX(data),
+				ShipData.getPosY(data),
+				ShipData.getDir(data),
+				ShipData.getAccel(data),
+				ShipData.getVelX(data),
+				ShipData.getVelY(data),
+				ShipData.getRotation(data),
+				ShipData.getDestroyed(data)
+			)
+			MessageType.BULLET_FIRE.ordinal -> onReceiveFiredBullet(
+				FiredBulletData.getBullet(data)
+			)
+			MessageType.BULLET_DESTROY.ordinal -> onReceiveDestroyedBullet(
+				DestroyedBulletData.getPlayerId(data),
+				DestroyedBulletData.getBulletIndex(data)
+			)
 		}
 	}
 
 	fun startHost() {
 		ShipManager.addShip(ShipManager.localShip, 0)
-		connManager.startHost()
+		connMan.startHost()
 	}
 
 	fun connect(address: String?) {
 		if (address.isNullOrBlank()) return
 		isClient = true
-		connManager.connect(address)
+		connMan.connect(address)
 	}
 
 	/** Disconnects all players. */
@@ -131,109 +122,89 @@ class MultiplayerManager private constructor() {
 	 */
 	fun disconnect(player: RemotePlayer) {
 		if (!players.remove(player)) return
-		connManager.disconnect(player)
+		connMan.disconnect(player)
 		onDisconnected(player)
 	}
 
+	fun tick() {
+		// Periodically send all asteroids (if server) and local ship to keep players in sync
+		if (isHost && Simulation.simulationTime - lastAsteroidsUpdate > 5000) {
+			sendAsteroids()
+		}
+		if (Simulation.simulationTime - lastLocalShipUpdate > 5000) {
+			sendLocalShipUpdate()
+		}
+	}
+
 	private fun sendGameData() {
-		if (players.isEmpty() || isClient) return
-		val data = arrayOfNulls<String>(3)
-		data[MESSAGE_TYPE] = MESSAGE_TYPE_GAME.toString()
-		data[IS_STARTED] = Simulation.isStarted.toString()
-		data[IS_PAUSED] = Simulation.isPaused().toString()
-		send(data)
+		if (isClient || players.isEmpty()) return
+		send(getData())
 	}
 
 	fun sendLevel() {
-		if (players.isEmpty() || isClient) return
-		val data = arrayOfNulls<String>(3)
-		data[MESSAGE_TYPE] = MESSAGE_TYPE_LEVEL.toString()
-		data[LEVEL] = LevelManager.level.toString()
-		send(data)
+		if (isClient || players.isEmpty()) return
+		send(LevelData.getData())
 	}
 
 	/** Sends all data for all asteroids. */
 	fun sendAsteroids() {
-		if (players.isEmpty() || isClient) return
-		val data = arrayOfNulls<String>(1 + 5 * Asteroid.asteroids.size)
-		data[MESSAGE_TYPE] = MESSAGE_TYPE_ASTEROIDS.toString()
-		Asteroid.asteroids.forEachIndexed { i, a ->
-			data[i * ASTEROIDS_DATA_SIZE + ASTEROID_POSX] = a.pos.x.toString()
-			data[i * ASTEROIDS_DATA_SIZE + ASTEROID_POSY] = a.pos.y.toString()
-			data[i * ASTEROIDS_DATA_SIZE + ASTEROID_DIR] = a.direction.toString()
-			data[i * ASTEROIDS_DATA_SIZE + ASTEROID_VEL] = a.velocity.toString()
-			data[i * ASTEROIDS_DATA_SIZE + ASTEROID_SIZE] = a.size.name
-		}
-		send(data)
-	}
-
-	/**
-	 * Sends data for the specified ship, including its bullets.
-	 * @param ship The ship to send.
-	 */
-	private fun sendShipData(ship: Ship) {
-		if (players.isEmpty()) return
-		val bullets = ship.bullets.toTypedArray()
-		val data = arrayOfNulls<String>(9 + 3 * bullets.size)
-		data[MESSAGE_TYPE] = MESSAGE_TYPE_PLAYER.toString()
-		data[PLAYER_ID] = ShipManager.ships.indexOf(ship).toString()
-		data[POSX] = ship.pos.x.toString()
-		data[POSY] = ship.pos.y.toString()
-		data[DIRECTION] = ship.rotateDeg.toString()
-		data[ACCEL] = ship.isAccelerating.toString()
-		data[DESTROYED] = ship.isDestroyed.toString()
-		data[SCORE] = ship.score.toString()
-		data[LIVES] = ship.lives.toString()
-		bullets.forEachIndexed { i, b ->
-			data[i * SHIP_BULLET_DATA_SIZE + SHIP_BULLET_POSX] = b.pos.x.toString()
-			data[i * SHIP_BULLET_DATA_SIZE + SHIP_BULLET_POSY] = b.pos.y.toString()
-			data[i * SHIP_BULLET_DATA_SIZE + SHIP_BULLET_DIR] = b.direction.toString()
-		}
-		send(data)
+		if (isClient || players.isEmpty()) return
+		send(AsteroidData.getData())
+		lastAsteroidsUpdate = Simulation.simulationTime
 	}
 
 	/**
 	 * Sends the connection status of a player.
-	 * @param player The player whose status is to be sent.
+	 * @param playerId The id of the player whose status is to be sent.
 	 * @param connected True if the player is connected, false if not.
 	 */
 	private fun sendPlayerConnectionStatus(playerId: Int, connected: Boolean) {
-		if (players.isEmpty() || isClient) return
-		val data = arrayOfNulls<String>(3)
-		data[MESSAGE_TYPE] = MESSAGE_TYPE_PLAYER.toString()
-		data[PLAYER_ID] = playerId.toString()
-		data[PLAYER_IS_CONNECTED] = connected.toString()
-		players.filterNot {
-			playerId == ShipManager.getPlayerId(it.ship)
-		}.forEach { player -> send(player, data) }
+		if (isClient || players.isEmpty()) return
+		val data = PlayerConnData.getData(playerId, connected)
+		players.filterNot { playerId == it.id }.forEach { player -> send(player, data) }
 	}
 
-	/**
-	 * Sends the connection status of all connected players (except the target player) to one client.
-	 * @param player The player to receive the connection data.
-	 */
-	private fun sendConnectedPlayers(player: RemotePlayer) {
-		if (players.isEmpty() || isClient) return
-		players.filterNot { it === player }.forEach { otherPlayer ->
-			val data = arrayOfNulls<String>(3)
-			data[MESSAGE_TYPE] = MESSAGE_TYPE_PLAYER.toString()
-			data[PLAYER_ID] = ShipManager.getPlayerId(otherPlayer.ship).toString()
-			data[PLAYER_IS_CONNECTED] = true.toString()
-			send(player, data)
+	/** Sends connection, ship data, score. and lives for all other players to the specified [player]. */
+	private fun sendOtherPlayerData(player: RemotePlayer) {
+		if (isClient || players.isEmpty()) return
+		ShipManager.ships.filterNotNull().forEach { ship ->
+			val shipPlayerId = ShipManager.getPlayerId(ship)
+			if (shipPlayerId == player.id) return@forEach
+			send(player, PlayerConnData.getData(shipPlayerId, true))
+			send(player, ShipData.getData(ship))
+			send(player, ScoreLivesData.getData(ship))
 		}
 	}
 
+	/** Sends score and lives for the specified [ship] to all connections. */
+	fun sendScoreData(ship: Ship) {
+		if (isClient || players.isEmpty()) return
+		send(ScoreLivesData.getData(ship))
+	}
+
 	/**
-	 * Client: Sends data for the local ship.
-	 * Server: Sends data for all ships.
+	 * Sends data for the specified [ship] to all connections.
+	 * @param isReceived True if the data was received from the player and being forwarded to other players.
 	 */
-	fun sendShipUpdate() {
+	private fun sendShipData(ship: Ship, isReceived: Boolean = false) {
+		if (players.isEmpty()) return
+		send(ShipData.getData(ship), ShipManager.getPlayerId(ship).takeIf { isReceived })
+	}
+
+	/** Sends ship and score data for the specified [ship] to all connections. */
+	fun sendShipWithScoreData(ship: Ship) {
+		if (isClient || players.isEmpty()) return
+		send(ShipData.getData(ship))
+		send(ScoreLivesData.getData(ship))
+	}
+
+	/** Sends an update of the local ship to all connections if it is not destroyed. */
+	fun sendLocalShipUpdate() {
 		if (!Simulation.isStarted || players.isEmpty()) return
-		if (isClient && !ShipManager.localShip.isDestroyed) {
-			sendShipData(ShipManager.localShip)
-		} else {
-			ShipManager.ships.filterNotNull().forEach {
+		ShipManager.localShip.let {
+			if (!it.isDestroyed) {
 				sendShipData(it)
+				lastLocalShipUpdate = Simulation.simulationTime
 			}
 		}
 	}
@@ -245,12 +216,7 @@ class MultiplayerManager private constructor() {
 	 */
 	fun sendFiredBullet(bullet: Bullet) {
 		if (players.isEmpty()) return
-		val data = arrayOfNulls<String>(5)
-		data[MESSAGE_TYPE] = MESSAGE_TYPE_BULLET.toString()
-		data[PLAYER_ID] = bullet.playerId.toString()
-		data[POSX] = bullet.pos.x.toString()
-		data[POSY] = bullet.pos.y.toString()
-		data[DIRECTION] = bullet.direction.toString()
+		val data = FiredBulletData.getData(bullet)
 		players.forEach { player ->
 			if (bullet.playerId != ShipManager.getPlayerId(player.ship)) {
 				send(player, data)
@@ -259,11 +225,22 @@ class MultiplayerManager private constructor() {
 	}
 
 	/**
-	 * Sends data to all connections.
-	 * @param data The data to be sent.
+	 * Sends the [index] of a destroyed bullet along with the originating [playerId].
+	 * This is only called by the host which manages object destruction.
 	 */
-	private fun send(data: Array<String?>) {
-		players.forEach { send(it, data) }
+	fun sendDestroyedBullet(playerId: Int, index: Int) {
+		if (players.isEmpty()) return
+		val data = DestroyedBulletData.getData(playerId, index)
+		players.forEach { player ->
+			send(player, data)
+		}
+	}
+
+	/** Sends [data] to all connections, except [excludePlayerId] if provided. */
+	private fun send(data: Array<String?>, excludePlayerId: Int? = null) {
+		players.forEach {
+			if (it.id != excludePlayerId) send(it, data)
+		}
 	}
 
 	/**
@@ -272,7 +249,7 @@ class MultiplayerManager private constructor() {
 	 * @param data The data to be sent.
 	 */
 	private fun send(player: RemotePlayer, data: Array<String?>) {
-		connManager.send(player, data.joinToString(" "))
+		connMan.send(player, data.joinToString(" "))
 	}
 
 	/**
@@ -296,16 +273,17 @@ class MultiplayerManager private constructor() {
 				remotePlayerId = ShipManager.ships.size
 			}
 			println("Remote client playerId: $remotePlayerId")
-			connManager.send(player, remotePlayerId)
+			connMan.send(player, remotePlayerId)
 			player.id = remotePlayerId
 			sendGameData()
 			sendAsteroids()
+			sendPlayerConnectionStatus(remotePlayerId, true)
 			player.ship = Ship().also {
 				if (Simulation.isStarted) it.lives = 0
 				ShipManager.addShip(it, remotePlayerId)
+				sendShipWithScoreData(it)
 			}
-			sendConnectedPlayers(player)
-			sendPlayerConnectionStatus(ShipManager.getPlayerId(player.ship), true)
+			sendOtherPlayerData(player)
 		}
 	}
 
@@ -313,7 +291,7 @@ class MultiplayerManager private constructor() {
 	 * Called when a player connection has been dropped.
 	 * @param player The dropped player.
 	 */
-	fun onDisconnected(player: RemotePlayer) {
+	private fun onDisconnected(player: RemotePlayer) {
 		val playerId = ShipManager.getPlayerId(player.ship)
 		sendPlayerConnectionStatus(playerId, false)
 		ShipManager.removeShip(playerId)
@@ -322,8 +300,8 @@ class MultiplayerManager private constructor() {
 		}
 	}
 
-	fun endMultiplayerSession() {
-		if (!isClient) connManager.stopHost()
+	private fun endMultiplayerSession() {
+		if (isHost) connMan.stopHost()
 		Simulation.isStarted = false
 		isConnected = false
 		isClient = false
@@ -356,41 +334,43 @@ class MultiplayerManager private constructor() {
 
 	/**
 	 * Called when player game data has been received.
-	 * @param player The player that the data has been received from. Only used by the host.
+	 * @param playerId The player ID the data belongs to.
+	 * @param score The score for the player.
+	 * @param lives The number of lives the player has.
+	 */
+	private fun onReceiveScoreAndLives(
+		playerId: Int, score: Int, lives: Int
+	) {
+		if (isHost) return
+		val ship = ShipManager.ships[playerId]!!
+		ship.score = score
+		ship.lives = lives
+	}
+
+	/**
+	 * Called when ship data has been received.
 	 * @param playerId The player ID the data belongs to.
 	 * @param posX The ship x position.
 	 * @param posY The ship y position.
 	 * @param rotationDeg The ship rotation in degrees.
 	 * @param thrust True if the ship is thrusting, false if not.
+	 * @param velX The ship x velocity.
+	 * @param velY The ship y velocity.
+	 * @param rotation The ship rotation speed/direction.
 	 * @param isDestroyed True if the ship is destroyed, false if alive.
-	 * @param score The score for the player.
-	 * @param lives The number of lives the player has.
-	 * @param bullets List of active bullets that the player has shot.
 	 */
-	private fun onReceivePlayerData(
-		player: RemotePlayer, playerId: Int, posX: Float, posY: Float, rotationDeg: Int, thrust: Boolean,
-		isDestroyed: Boolean, score: Int, lives: Int, bullets: List<Bullet>?
+	private fun onReceiveShip(
+		playerId: Int, posX: Float, posY: Float,
+		rotationDeg: Int, thrust: Boolean,
+		velX: Float, velY: Float,
+		rotation: Int, isDestroyed: Boolean
 	) {
-		val ships = ShipManager.ships
-		if (!isClient && playerId != 0) {
-			player.ship!!.forceUpdate(posX, posY, rotationDeg, thrust)
+		val ship = ShipManager.ships[playerId]!!
+		if (isHost && playerId != 0) {
+			ship.forceUpdate(posX, posY, rotationDeg, thrust, velX, velY, rotation)
+			sendShipData(ship, true)
 		} else if (isClient) {
-			if (playerId >= ships.size) {
-				println("Received data for uninitialized player")
-				return
-			}
-			val ship = ships[playerId]
-			if (ship == null) {
-				println("Received data for null player")
-				return
-			}
-			ship.score = score
-			ship.lives = lives
-			if (ship != ShipManager.localShip) {
-				ship.forceUpdate(posX, posY, rotationDeg, thrust)
-			}
-			ship.bullets.clear()
-			bullets?.let { ship.bullets.addAll(it) }
+			ship.forceUpdate(posX, posY, rotationDeg, thrust, velX, velY, rotation)
 			if (isDestroyed && !ship.isDestroyed) {
 				ship.destroy()
 			} else if (!isDestroyed && ship.isDestroyed) {
@@ -405,21 +385,27 @@ class MultiplayerManager private constructor() {
 	 * @param ship The ship where the shot originated from. Only used by host.
 	 * @param bullet The fired bullet.
 	 */
-	private fun onReceiveFiredBulletData(ship: Ship, bullet: Bullet) {
-		if (!isClient) {
-			sendFiredBullet(bullet)
-			ship.bullets.let {
-				it.add(bullet)
-			}
-		}
+	private fun onReceiveFiredBullet(bullet: Bullet) {
+		if (isHost) sendFiredBullet(bullet)
+		ShipManager.ships[bullet.playerId]!!.bullets.add(bullet)
 		Audio.SHOOT.play()
+	}
+
+	private fun onReceiveDestroyedBullet(playerId: Int, bulletIndex: Int) {
+		if (isHost) return
+		try {
+			ShipManager.ships[playerId]!!.bullets.removeAt(bulletIndex)
+		} catch (e: IndexOutOfBoundsException) {
+			e.printStackTrace()
+		}
 	}
 
 	/**
 	 * Called when asteroid data is received.
 	 * @param updatedAsteroids List of asteroids.
 	 */
-	private fun onReceiveAsteroidData(updatedAsteroids: List<Asteroid>?) {
+	private fun onReceiveAsteroids(updatedAsteroids: List<Asteroid>?) {
+		if (isHost) return
 		val asteroids = Asteroid.asteroids
 		if (updatedAsteroids == null) {
 			if (asteroids.size == 1 && asteroids[0].size == Size.SMALL) {
@@ -449,35 +435,261 @@ class MultiplayerManager private constructor() {
 		var ship: Ship? = null
 	}
 
+	private enum class MessageType {
+		GAME,
+		LEVEL,
+		ASTEROIDS,
+		PLAYER_CONN,
+		SCORE_LIVES,
+		SHIP,
+		BULLET_FIRE,
+		BULLET_DESTROY;
+
+		companion object {
+			/** Index of message type value in data. */
+			const val dataIndex = 0
+		}
+	}
+
+	private enum class GameData {
+		IS_STARTED,
+		IS_PAUSED;
+
+		/** Index of value in data array, accounting for [MessageType] preceding it. */
+		val dataIndex = 1 + ordinal
+
+		companion object {
+			val valCount = values().size
+
+			fun getData(): Array<String?> {
+				val data = arrayOfNulls<String>(1 + valCount)
+				data[MessageType.dataIndex] = MessageType.GAME.ordinal.toString()
+				data[IS_STARTED.dataIndex] = Simulation.isStarted.toString()
+				data[IS_PAUSED.dataIndex] = Simulation.isPaused().toString()
+				return data
+			}
+
+			fun getIsStarted(data: Array<String>) = data[IS_STARTED.dataIndex].toBoolean()
+			fun getIsPaused(data: Array<String>) = data[IS_PAUSED.dataIndex].toBoolean()
+		}
+	}
+
+	private enum class LevelData {
+		LEVEL;
+
+		/** Index of value in data array, accounting for [MessageType] preceding it. */
+		val dataIndex = 1 + ordinal
+
+		companion object {
+			val valCount = values().size
+
+			fun getData(): Array<String?> {
+				val data = arrayOfNulls<String>(1 + valCount)
+				data[MessageType.dataIndex] = MessageType.LEVEL.ordinal.toString()
+				data[LEVEL.dataIndex] = LevelManager.level.toString()
+				return data
+			}
+
+			fun getLevel(data: Array<String>) = data[LEVEL.dataIndex].toInt()
+		}
+	}
+
+	private enum class AsteroidData {
+		POS_X,
+		POS_Y,
+		DIR,
+		VEL,
+		SIZE;
+
+		/** Index of value in data array, accounting for [MessageType] preceding it. */
+		val dataIndex = 1 + ordinal
+
+		companion object {
+			val valCount = values().size
+
+			fun getData(): Array<String?> {
+				val data = arrayOfNulls<String>(1 + valCount * Asteroid.asteroids.size)
+				data[MessageType.dataIndex] = MessageType.ASTEROIDS.ordinal.toString()
+				Asteroid.asteroids.forEachIndexed { i, a ->
+					data[i * valCount + POS_X.dataIndex] = a.pos.x.toString()
+					data[i * valCount + POS_Y.dataIndex] = a.pos.y.toString()
+					data[i * valCount + DIR.dataIndex] = a.direction.toString()
+					data[i * valCount + VEL.dataIndex] = a.velocity.toString()
+					data[i * valCount + SIZE.dataIndex] = a.size.ordinal.toString()
+				}
+				return data
+			}
+
+			fun getAsteroids(data: Array<String>): List<Asteroid>? {
+				var asteroids: MutableList<Asteroid>? = null
+				if (data.size > POS_X.dataIndex) {
+					asteroids = mutableListOf()
+					var i = 0
+					while (i * valCount + POS_X.dataIndex < data.size) {
+						asteroids.add(
+							Asteroid(
+								data[i * valCount + POS_X.dataIndex].toFloat(),
+								data[i * valCount + POS_Y.dataIndex].toFloat(),
+								data[i * valCount + DIR.dataIndex].toInt(),
+								data[i * valCount + VEL.dataIndex].toInt(),
+								Size.values()[data[i * valCount + SIZE.dataIndex].toInt()]
+							)
+						)
+						i++
+					}
+				}
+				return asteroids
+			}
+		}
+	}
+
+	private enum class PlayerConnData {
+		PLAYER_ID,
+		IS_CONNECTED;
+
+		/** Index of value in data array, accounting for [MessageType] preceding it. */
+		val dataIndex = 1 + ordinal
+
+		companion object {
+			val valCount = values().size
+
+			fun getData(playerId: Int, connected: Boolean): Array<String?> {
+				val data = arrayOfNulls<String>(1 + valCount)
+				data[MessageType.dataIndex] = MessageType.PLAYER_CONN.ordinal.toString()
+				data[PLAYER_ID.dataIndex] = playerId.toString()
+				data[IS_CONNECTED.dataIndex] = connected.toString()
+				return data
+			}
+			fun getPlayerId(data: Array<String>) = data[PLAYER_ID.dataIndex].toInt()
+			fun getIsConnected(data: Array<String>) = data[IS_CONNECTED.dataIndex].toBoolean()
+		}
+	}
+
+	private enum class ScoreLivesData {
+		PLAYER_ID,
+		SCORE,
+		LIVES;
+
+		/** Index of value in data array, accounting for [MessageType] preceding it. */
+		val dataIndex = 1 + ordinal
+
+		companion object {
+			val valCount = values().size
+
+			fun getData(ship: Ship): Array<String?> {
+				val data = arrayOfNulls<String>(1 + valCount)
+				data[MessageType.dataIndex] = MessageType.SCORE_LIVES.ordinal.toString()
+				data[PLAYER_ID.dataIndex] = ShipManager.getPlayerId(ship).toString()
+				data[SCORE.dataIndex] = ship.score.toString()
+				data[LIVES.dataIndex] = ship.lives.toString()
+				return data
+			}
+
+			fun getPlayerId(data: Array<String>) = data[PLAYER_ID.dataIndex].toInt()
+			fun getScore(data: Array<String>) = data[SCORE.dataIndex].toInt()
+			fun getLives(data: Array<String>) = data[LIVES.dataIndex].toInt()
+		}
+	}
+
+	private enum class ShipData {
+		PLAYER_ID,
+		POS_X,
+		POS_Y,
+		DIR,
+		ACCEL,
+		VEL_X,
+		VEL_Y,
+		ROTATION,
+		DESTROYED;
+
+		/** Index of value in data array, accounting for [MessageType] preceding it. */
+		val dataIndex = 1 + ordinal
+
+		companion object {
+			val valCount = values().size
+
+			fun getData(ship: Ship): Array<String?> {
+				val data = arrayOfNulls<String>(1 + valCount)
+				data[MessageType.dataIndex] = MessageType.SHIP.ordinal.toString()
+				data[PLAYER_ID.dataIndex] = ShipManager.getPlayerId(ship).toString()
+				data[POS_X.dataIndex] = ship.pos.x.toString()
+				data[POS_Y.dataIndex] = ship.pos.y.toString()
+				data[DIR.dataIndex] = ship.rotateDeg.toString()
+				data[ACCEL.dataIndex] = ship.isAccelerating.toString()
+				data[VEL_X.dataIndex] = ship.velX.toString()
+				data[VEL_Y.dataIndex] = ship.velY.toString()
+				data[ROTATION.dataIndex] = ship.rotation.toString()
+				data[DESTROYED.dataIndex] = ship.isDestroyed.toString()
+				return data
+			}
+
+			fun getPlayerId(data: Array<String>) = data[PLAYER_ID.dataIndex].toInt()
+			fun getPosX(data: Array<String>) = data[POS_X.dataIndex].toFloat()
+			fun getPosY(data: Array<String>) = data[POS_Y.dataIndex].toFloat()
+			fun getDir(data: Array<String>) = data[DIR.dataIndex].toInt()
+			fun getAccel(data: Array<String>) = data[ACCEL.dataIndex].toBoolean()
+			fun getVelX(data: Array<String>) = data[VEL_X.dataIndex].toFloat()
+			fun getVelY(data: Array<String>) = data[VEL_Y.dataIndex].toFloat()
+			fun getRotation(data: Array<String>) = data[ROTATION.dataIndex].toInt()
+			fun getDestroyed(data: Array<String>) = data[DESTROYED.dataIndex].toBoolean()
+		}
+	}
+
+	private enum class FiredBulletData {
+		PLAYER_ID,
+		POS_X,
+		POS_Y,
+		DIR;
+
+		/** Index of value in data array, accounting for [MessageType] preceding it. */
+		val dataIndex = 1 + ordinal
+
+		companion object {
+			val valCount = values().size
+
+			fun getData(bullet: Bullet): Array<String?> {
+				val data = arrayOfNulls<String>(1 + valCount)
+				data[MessageType.dataIndex] = MessageType.BULLET_FIRE.ordinal.toString()
+				data[PLAYER_ID.dataIndex] = bullet.playerId.toString()
+				data[POS_X.dataIndex] = bullet.pos.x.toString()
+				data[POS_Y.dataIndex] = bullet.pos.y.toString()
+				data[DIR.dataIndex] = bullet.direction.toString()
+				return data
+			}
+
+			fun getBullet(data: Array<String>) = Bullet(
+				data[PLAYER_ID.dataIndex].toInt(),
+				data[POS_X.dataIndex].toFloat(),
+				data[POS_Y.dataIndex].toFloat(),
+				data[DIR.dataIndex].toInt()
+			)
+		}
+	}
+
+	private enum class DestroyedBulletData {
+		PLAYER_ID,
+		BULLET_INDEX;
+
+		/** Index of value in data array, accounting for [MessageType] preceding it. */
+		val dataIndex = 1 + ordinal
+
+		companion object {
+			val valCount = values().size
+
+			fun getData(playerId: Int, bulletIndex: Int): Array<String?> {
+				val data = arrayOfNulls<String>(1 + valCount)
+				data[MessageType.dataIndex] = MessageType.BULLET_DESTROY.ordinal.toString()
+				data[PLAYER_ID.dataIndex] = playerId.toString()
+				data[BULLET_INDEX.dataIndex] = bulletIndex.toString()
+				return data
+			}
+
+			fun getPlayerId(data: Array<String>) = data[PLAYER_ID.dataIndex].toInt()
+			fun getBulletIndex(data: Array<String>) = data[BULLET_INDEX.dataIndex].toInt()
+		}
+	}
+
 	companion object {
 		val instance by lazy { MultiplayerManager() }
-		private const val MESSAGE_TYPE_GAME = 0
-		private const val MESSAGE_TYPE_LEVEL = 1
-		private const val MESSAGE_TYPE_ASTEROIDS = 2
-		private const val MESSAGE_TYPE_PLAYER = 3
-		private const val MESSAGE_TYPE_BULLET = 4
-		private const val MESSAGE_TYPE = 0
-		private const val IS_STARTED = 1
-		private const val IS_PAUSED = 2
-		private const val LEVEL = 1
-		private const val PLAYER_IS_CONNECTED = 2
-		private const val ASTEROIDS_DATA_SIZE = 5
-		private const val ASTEROID_POSX = 1
-		private const val ASTEROID_POSY = 2
-		private const val ASTEROID_DIR = 3
-		private const val ASTEROID_VEL = 4
-		private const val ASTEROID_SIZE = 5
-		private const val PLAYER_ID = 1
-		private const val POSX = 2
-		private const val POSY = 3
-		private const val DIRECTION = 4
-		private const val ACCEL = 5
-		private const val DESTROYED = 6
-		private const val SCORE = 7
-		private const val LIVES = 8
-		private const val SHIP_BULLET_DATA_SIZE = 3
-		private const val SHIP_BULLET_POSX = 9
-		private const val SHIP_BULLET_POSY = 10
-		private const val SHIP_BULLET_DIR = 11
 	}
 }

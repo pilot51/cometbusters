@@ -19,6 +19,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import java.io.IOException
 import java.net.UnknownHostException
+import MultiplayerManager.Companion.instance as mpMan
 import java.awt.Color as JavaColor
 import java.awt.Font as JavaFont
 import java.awt.Graphics as JavaGraphics
@@ -214,7 +215,7 @@ actual object Platform {
 						println("Could not listen on port $PORT")
 						return@launch
 					}
-					mpManager.connectionListener.onHostWaiting()
+					mpMan.connectionListener.onHostWaiting()
 					var connectionsFull = false
 					while (serverSocket != null) {
 						if (connectionsFull) {
@@ -227,7 +228,7 @@ actual object Platform {
 							@Suppress("BlockingMethodInNonBlockingContext")
 							val conn = Connection(serverSocket!!.accept())
 							connections.add(conn)
-							mpManager.onConnected(conn.player)
+							mpMan.onConnected(conn.player)
 							startListening(conn.player)
 						} catch (e: Exception) {
 							if (serverSocket != null) {
@@ -260,27 +261,27 @@ actual object Platform {
 						val conn = Connection(address)
 						connections.add(conn)
 						conn.player.id = receive(conn.player)!!.toInt()
-						mpManager.onConnected(conn.player)
+						mpMan.onConnected(conn.player)
 						startListening(conn.player)
 					} catch (e: UnknownHostException) {
 						println("Unknown host: $address")
-						mpManager.isClient = false
+						mpMan.isClient = false
 					} catch (e: IOException) {
 						println("Connection failed!")
 						e.printStackTrace()
-						mpManager.isClient = false
+						mpMan.isClient = false
 					}
 				}
 			}
 
 			private fun startListening(player: MultiplayerManager.RemotePlayer) {
 				CoroutineScope(Dispatchers.IO).launch {
-					while (mpManager.players.contains(player)) {
+					while (mpMan.players.contains(player)) {
 						val msg = receive(player)
 						if (msg != null) {
-							mpManager.onReceive(player, msg)
+							mpMan.onReceive(player, msg)
 						} else {
-							mpManager.disconnect(player)
+							mpMan.disconnect(player)
 							break
 						}
 					}
@@ -367,7 +368,6 @@ actual object Platform {
 
 			actual companion object {
 				actual val instance by lazy { ConnectionManager() }
-				private val mpManager = MultiplayerManager.instance
 				private const val PORT = 50001
 			}
 		}

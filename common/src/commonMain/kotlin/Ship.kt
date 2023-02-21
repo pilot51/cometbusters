@@ -27,6 +27,7 @@ import RenderUtils.convertToSolidColor
 import kotlin.math.abs
 import kotlin.math.cos
 import kotlin.math.sin
+import MultiplayerManager.Companion.instance as mpMan
 
 /** Creates a new ship, initially not spawned. Call [spawn] to spawn the ship. */
 class Ship internal constructor() : Entity(0f, 0f, 0, 0, THRUST, ROTATE_SPEED) {
@@ -55,6 +56,10 @@ class Ship internal constructor() : Entity(0f, 0f, 0, 0, THRUST, ROTATE_SPEED) {
 	val bullets: MutableList<Bullet> = ArrayList(MAX_BULLETS)
 	var score = 0
 	var lives = 5
+		set(value) {
+			field = value
+			if (value > maxLives) maxLives = value
+		}
 
 	/** @return The highest number of lives this ship has had. */
 	var maxLives = lives
@@ -67,11 +72,17 @@ class Ship internal constructor() : Entity(0f, 0f, 0, 0, THRUST, ROTATE_SPEED) {
 	}
 
 	/** Forces update of ship position, rotation, and thrust. */
-	fun forceUpdate(x: Float, y: Float, rotationDeg: Int, thrust: Boolean) {
+	fun forceUpdate(
+		x: Float, y: Float, rotationDeg: Int,
+		thrust: Boolean, velX: Float, velY: Float, rotation: Int
+	) {
 		pos.x = x
 		pos.y = y
 		rotateDeg = rotationDeg
 		thrust(thrust)
+		this.velX = velX
+		this.velY = velY
+		this.rotation = rotation
 	}
 
 	/**
@@ -132,11 +143,25 @@ class Ship internal constructor() : Entity(0f, 0f, 0, 0, THRUST, ROTATE_SPEED) {
 	 * Makes ship accelerate forward if set to true.<br></br>
 	 * Plays or stops thrust sound.
 	 * @param activate True to activate thrust, false to deactivate.
+	 * @param isFromInput True if thrust is activated by user input.
 	 */
-	fun thrust(activate: Boolean) {
+	fun thrust(activate: Boolean, isFromInput: Boolean = false) {
 		if (isAccelerating == activate) return
 		isAccelerating = activate
+		if (isFromInput) mpMan.sendLocalShipUpdate()
 		if (activate) Audio.THRUST.loop() else Audio.THRUST.stop()
+	}
+
+	override fun rotateLeft() = super.rotateLeft().also {
+		if (it) mpMan.sendLocalShipUpdate()
+	}
+
+	override fun rotateRight() = super.rotateRight().also {
+		if (it) mpMan.sendLocalShipUpdate()
+	}
+
+	override fun rotateStop() = super.rotateStop().also {
+		if (it) mpMan.sendLocalShipUpdate()
 	}
 
 	/**
@@ -149,9 +174,9 @@ class Ship internal constructor() : Entity(0f, 0f, 0, 0, THRUST, ROTATE_SPEED) {
 			Audio.SHOOT.play()
 			val bulletX = (pos.x + sin(Math.toRadians(rotateDeg.toDouble())) * (radius - Bullet.bulletRadius)).toFloat()
 			val bulletY = (pos.y - cos(Math.toRadians(rotateDeg.toDouble())) * (radius - Bullet.bulletRadius)).toFloat()
-			val bullet = Bullet(ShipManager.getPlayerId(this@Ship), bulletX, bulletY, rotateDeg)
+			val bullet = Bullet(ShipManager.getPlayerId(this), bulletX, bulletY, rotateDeg)
 			bullets.add(bullet)
-			MultiplayerManager.instance.sendFiredBullet(bullet)
+			mpMan.sendFiredBullet(bullet)
 		}
 	}
 
@@ -170,12 +195,12 @@ class Ship internal constructor() : Entity(0f, 0f, 0, 0, THRUST, ROTATE_SPEED) {
 	fun spawn() {
 		super.undestroy()
 		birthTime = Simulation.simulationTime
-		lives--
+		if (mpMan.isHost) lives--
 		Audio.SPAWN.play()
 	}
 
 	val isSpawning: Boolean
-		get() = aliveTime < MATERIALIZE_TIME
+		get() = !isDestroyed && aliveTime < MATERIALIZE_TIME
 
 	fun spawnProgress() = aliveTime.toDouble() / MATERIALIZE_TIME
 
@@ -191,6 +216,7 @@ class Ship internal constructor() : Entity(0f, 0f, 0, 0, THRUST, ROTATE_SPEED) {
 		terminate()
 		Audio.EXPLODE_PLAYER.play()
 		if (lives > 0) {
+			if (mpMan.isClient) return
 			reset(false)
 			val deathTime = Simulation.simulationTime
 			Timer().run(Simulation.TICK_RATE.toLong(), (1000 / Simulation.TICK_RATE).toLong()) {
@@ -199,6 +225,7 @@ class Ship internal constructor() : Entity(0f, 0f, 0, 0, THRUST, ROTATE_SPEED) {
 				} else if (Simulation.simulationTime - deathTime >= RESPAWN_DELAY && isSafeHaven) {
 					spawn()
 					it.cancel()
+					mpMan.sendShipWithScoreData(this)
 				}
 			}
 		} else {
@@ -207,17 +234,16 @@ class Ship internal constructor() : Entity(0f, 0f, 0, 0, THRUST, ROTATE_SPEED) {
 				LevelManager.gameOver()
 			}
 		}
+		mpMan.sendShipWithScoreData(this)
 	}
 
 	fun addScore(scoreToAdd: Int) {
 		if (score / NEW_SHIP_SCORE < (score + scoreToAdd) / NEW_SHIP_SCORE) {
 			lives++
-			if (lives > maxLives) {
-				maxLives = lives
-			}
 			Audio.EXTRA_LIFE.play()
 		}
 		score += scoreToAdd
+		mpMan.sendScoreData(this)
 	}
 
 	/**
@@ -225,6 +251,7 @@ class Ship internal constructor() : Entity(0f, 0f, 0, 0, THRUST, ROTATE_SPEED) {
 	 * @param resetForNewGame True to reset lives and score for new game, false to leave them unchanged for respawning.
 	 */
 	fun reset(resetForNewGame: Boolean) {
+		if (mpMan.isClient) return
 		val startPos = ShipManager.getSpawnPosition(ShipManager.getPlayerId(this))
 		pos.x = startPos.x
 		pos.y = startPos.y
