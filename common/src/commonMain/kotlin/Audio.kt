@@ -64,8 +64,10 @@ enum class Audio(
 	}
 
 	companion object {
-		private var isSoundEnabled = true
-		private var isMusicEnabled = true
+		var isSoundEnabled = true
+			private set
+		var isMusicEnabled = false
+			private set
 
 		/** @return True if sound has been enabled, false if disabled. */
 		fun toggleSound(): Boolean {

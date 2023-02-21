@@ -108,8 +108,8 @@ actual class GameView @Throws(IOException::class) constructor() : JComponent(), 
 		val menuConnect = JMenuItem("Connect", KeyEvent.VK_N)
 		val menuDisconnect = JMenuItem("Disconnect", KeyEvent.VK_D)
 		val buttonPause = JButton("Pause")
-		val buttonSound = JButton("Sound")
-		val buttonMusic = JButton("Music")
+		val buttonSound = JButton(getSoundText())
+		val buttonMusic = JButton(getMusicText())
 		val buttonHelp = JButton("Help")
 		val buttonAbout = JButton("About")
 		menuDisconnect.isVisible = false
@@ -165,9 +165,11 @@ actual class GameView @Throws(IOException::class) constructor() : JComponent(), 
 		}
 		menuDisconnect.addActionListener { mpMan.disconnect() }
 		buttonPause.addActionListener { Simulation.setPaused(!Simulation.isPaused()) }
-		buttonSound.addActionListener { buttonSound.text = if (Audio.toggleSound()) "Sound" else "(sound)" }
+		buttonSound.addActionListener {
+			buttonSound.text = getSoundText(Audio.toggleSound())
+		}
 		buttonMusic.addActionListener {
-			buttonMusic.text = if (Audio.toggleMusic()) "Music" else "(music)"
+			buttonMusic.text = getMusicText(Audio.toggleMusic())
 		}
 		popupGame.add(menuHost)
 		popupGame.add(menuConnect)
@@ -233,6 +235,11 @@ actual class GameView @Throws(IOException::class) constructor() : JComponent(), 
 		})
 		return menuBar
 	}
+
+	private fun getSoundText(soundEnabled: Boolean = Audio.isSoundEnabled) =
+		if (soundEnabled) "Sound" else "(sound)"
+	private fun getMusicText(musicEnabled: Boolean = Audio.isMusicEnabled) =
+		if (musicEnabled) "Music" else "(music)"
 
 	override fun keyPressed(e: KeyEvent) {
 		val ship = ShipManager.localShip

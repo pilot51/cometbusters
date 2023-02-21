@@ -55,6 +55,8 @@ actual class GameView {
 	private val pressedKeys = HashMap<String, Boolean>(5)
 
 	init {
+		setSoundText()
+		setMusicText()
 		document.body!!.append(renderView.jsCanvas)
 		LevelManager.createBackgroundAsteroids()
 		initKeyListeners()
@@ -163,10 +165,10 @@ actual class GameView {
 			Simulation.setPaused(!Simulation.isPaused())
 		})
 		btnSound.addEventListener("click", {
-			btnSound.innerHTML = if (Audio.toggleSound()) "<u>S</u>ound" else "(<u>s</u>ound)"
+			setSoundText(Audio.toggleSound())
 		})
 		btnMusic.addEventListener("click", {
-			btnMusic.innerHTML = if (Audio.toggleMusic()) "<u>M</u>usic" else "(<u>m</u>usic)"
+			setMusicText(Audio.toggleMusic())
 		})
 		menuHost.addEventListener("click", {
 			mpMan.startHost()
@@ -182,6 +184,13 @@ actual class GameView {
 		document.body!!.addEventListener("click", {
 			if (gameDropdown.classList.contains("show")) toggleGameMenu()
 		})
+	}
+
+	private fun setSoundText(soundEnabled: Boolean = Audio.isSoundEnabled) {
+		btnSound.innerHTML = if (soundEnabled) "<u>S</u>ound" else "(<u>s</u>ound)"
+	}
+	private fun setMusicText(musicEnabled: Boolean = Audio.isMusicEnabled) {
+		btnMusic.innerHTML = if (musicEnabled) "<u>M</u>usic" else "(<u>m</u>usic)"
 	}
 
 	private fun initConnectionListener() {
